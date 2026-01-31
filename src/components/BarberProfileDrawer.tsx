@@ -14,6 +14,7 @@ import {
     HelpCircle
 } from 'lucide-react';
 import { ShopAvatar } from '../../components/ShopAvatar';
+import { EditProfileModal } from './profile/modals/EditProfileModal';
 
 interface BarberProfileDrawerProps {
     isOpen: boolean;
@@ -29,6 +30,7 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
 }) => {
     const { user, signOut } = useAuth();
     const [copied, setCopied] = useState(false);
+    const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
     const link = "https://barbearialinkteste.com/"; // TODO: replace with dynamic link if available
 
     // Handle back button on Android
@@ -131,8 +133,13 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
                         {/* Meu Perfil */}
                         <button
                             onClick={() => {
-                                onNavigate('profile');
-                                onClose();
+                                setIsEditProfileOpen(true);
+                                // Don't close drawer if we want modal on top, 
+                                // BUT usually drawers might overlap or close. 
+                                // Since modal is fixed inset-0 z-110, it will show over drawer (z-100).
+                                // Let's keep drawer open or close it? 
+                                // If we close drawer, going back from modal might be weird.
+                                // Let's keep drawer open for now.
                             }}
                             className="w-full flex items-center justify-between py-4 border-b border-white/[0.08] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
                         >
@@ -229,6 +236,11 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
 
                 </div>
             </div>
+
+            <EditProfileModal
+                isOpen={isEditProfileOpen}
+                onClose={() => setIsEditProfileOpen(false)}
+            />
         </div>
     );
 };

@@ -13,6 +13,32 @@ const AppContent: React.FC = () => {
 
     useEffect(() => {
         const fetchShop = async () => {
+            // MOCK SHOP DATA HANDLING
+            if (shopId === 'shop-123') {
+                setShopData({
+                    id: 'shop-123',
+                    name: 'Barber Shop Dev',
+                    slug: 'barber-dev',
+                    owner_id: 'dev-123',
+                    logo_url: 'https://github.com/shadcn.png',
+                    phones: ['(11) 99999-9999'],
+                    address: {
+                        street: 'Rua Dev',
+                        number: '123',
+                        neighborhood: 'Code Valley',
+                        city: 'Tech City',
+                        state: 'SP',
+                        zipCode: '00000-000'
+                    },
+                    rating: 5,
+                    settings: {
+                        primaryColor: '#00FF9D',
+                        secondaryColor: '#000000'
+                    }
+                } as any); // Type cast as needed if Shop interface is strict
+                return;
+            }
+
             if (shopId) {
                 try {
                     const data = await getShop(shopId);
@@ -35,8 +61,13 @@ const AppContent: React.FC = () => {
         );
     }
     // 2. Auth Check
+    // 2. Auth Check
     if (!session) {
-        return null; // AuthContext handles redirect/login state
+        // Since we are likely in a larger app, we should redirect to login
+        // If this is a standalone component being mounted, we might need a different strategy
+        // But per request "Redirect to /login"
+        window.location.href = '/login';
+        return null;
     }
 
     // 3. Main Render
