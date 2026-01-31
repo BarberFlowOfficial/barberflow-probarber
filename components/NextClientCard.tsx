@@ -55,7 +55,9 @@ export const NextClientCard: React.FC<NextClientCardProps> = ({ upcomingAppointm
                             </span>
                             <span className="w-1.5 h-1.5 bg-zinc-700 rounded-full"></span>
                             <span className="text-sm font-medium text-zinc-300">
-                                {upcomingAppointments[0]?.services_list || '-'}
+                                {Array.isArray(upcomingAppointments[0]?.services_list)
+                                    ? upcomingAppointments[0].services_list.map((s: any) => s.name || s).join(', ')
+                                    : upcomingAppointments[0]?.services_list || '-'}
                             </span>
                             <span className="w-1.5 h-1.5 bg-zinc-700 rounded-full"></span>
                             <span className="text-sm text-zinc-500">

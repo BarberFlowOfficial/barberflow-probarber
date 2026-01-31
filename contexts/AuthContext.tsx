@@ -1,9 +1,12 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session, User } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
+import { getUserProfessionalProfile } from '../lib/services/barberService';
 
 interface AuthContextType {
     session: Session | null;
     user: User | null;
+    userProfile: any | null; // New field to store full profile
     shopId: string | null;
     barberId: string | null;
     userRole: 'owner' | 'barber' | null;
@@ -11,75 +14,136 @@ interface AuthContextType {
     signOut: () => Promise<void>;
 }
 
-// MOCK DATA CONSTANTS (DEV MODE)
-const MOCK_USER = {
-    id: 'dev-123',
-    aud: 'authenticated',
-    role: 'authenticated',
-    email: 'dev@barber.com',
-    email_confirmed_at: new Date().toISOString(),
-    phone: '',
-    confirmation_sent_at: '',
-    confirmed_at: '',
-    last_sign_in_at: '',
-    app_metadata: { provider: 'email', providers: ['email'] },
-    user_metadata: {
-        name: 'Barbeiro Dev',
-        avatar_url: 'https://github.com/shadcn.png',
-        phone: '(11) 99999-9999'
-    },
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-} as User;
+const extractTokenFromHash = () => {
+    const hash = window.location.hash;
+    if (!hash) return null;
 
-const MOCK_SESSION = {
-    access_token: 'mock-token',
-    refresh_token: 'mock-refresh',
-    expires_in: 3600,
-    token_type: 'bearer',
-    user: MOCK_USER
-} as Session;
+    const params = new URLSearchParams(hash.substring(1)); // Remove the '#'
+    const accessToken = params.get('access_token');
 
-const MOCK_SHOP_ID = 'shop-123';
-const MOCK_ROLE = 'barber'; // 'owner' or 'barber'
+    if (!accessToken) return null;
+
+    try {
+        // Decode JWT payload (part 2)
+        const base64Url = accessToken.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+
+        return JSON.parse(jsonPayload);
+    } catch (e) {
+        console.error('Error parsing token:', e);
+        return null;
+    }
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    // FORCE MOCK STATE
-    const [session] = useState<Session | null>(MOCK_SESSION);
-    const [user] = useState<User | null>(MOCK_USER);
-    const [shopId] = useState<string | null>(MOCK_SHOP_ID);
-    const [userRole] = useState<'owner' | 'barber' | null>(MOCK_ROLE);
-    const [isLoading] = useState(false); // No loading needed for mock
+    const [session, setSession] = useState<Session | null>(null);
+    const [user, setUser] = useState<User | null>(null);
+    const [userProfile, setUserProfile] = useState<any | null>(null); // State for full profile
+    const [shopId, setShopId] = useState<string | null>(null);
+    const [barberId, setBarberId] = useState<string | null>(null);
+    const [userRole, setUserRole] = useState<'owner' | 'barber' | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-    // BYPASS REAL VALIDATION FOR NOW
-    /*
-    const validateProfile = useCallback(async (userId: string) => {
-        // ... original logic ...
-    }, []);
-    */
+    const validateProfile = async (userId: string) => {
+        try {
+            console.log('Validating profile for:', userId);
+            const profile = await getUserProfessionalProfile(userId);
 
-    /*
+            if (profile) {
+                console.log('Profile found:', profile);
+                setUserProfile(profile); // Store full profile
+                setShopId(profile.shopId);
+                if (profile.barberId) setBarberId(profile.barberId);
+                setUserRole(profile.userRole);
+            } else {
+                console.warn('No professional profile found for user:', userId);
+            }
+        } catch (error) {
+            console.error('Error validating profile:', error);
+        }
+    };
+
     useEffect(() => {
-       // ... original auth subscription ...
-    }, [validateProfile]);
-    */
+        let mounted = true;
+
+        const initAuth = async () => {
+            // 1. Try to get token from URL (Priority)
+            const tokenPayload = extractTokenFromHash();
+
+            if (tokenPayload && tokenPayload.sub) {
+                console.log('Token detected in URL. ID:', tokenPayload.sub);
+                await validateProfile(tokenPayload.sub);
+            }
+
+            // 2. Standard Supabase Session Check
+            const { data: { session: existingSession } } = await supabase.auth.getSession();
+
+            if (mounted) {
+                if (existingSession) {
+                    setSession(existingSession);
+                    setUser(existingSession.user);
+                    if (!shopId) {
+                        await validateProfile(existingSession.user.id);
+                    }
+                }
+                setIsLoading(false);
+            }
+
+            // 3. Listen for changes
+            const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+                if (!mounted) return;
+
+                console.log('Auth state change:', _event);
+                setSession(newSession);
+                setUser(newSession?.user ?? null);
+
+                if (newSession?.user && _event === 'SIGNED_IN') {
+                    await validateProfile(newSession.user.id);
+                } else if (_event === 'SIGNED_OUT') {
+                    setUserProfile(null);
+                    setShopId(null);
+                    setBarberId(null);
+                    setUserRole(null);
+                }
+
+                setIsLoading(false);
+            });
+
+            return () => {
+                mounted = false;
+                subscription.unsubscribe();
+            };
+        };
+
+        initAuth();
+    }, []);
+
+    const signOut = async () => {
+        await supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+        setUserProfile(null);
+        setShopId(null);
+        setBarberId(null);
+        setUserRole(null);
+        window.location.href = '/login';
+    };
 
     return (
         <AuthContext.Provider value={{
             session,
             user,
+            userProfile, // Expose full profile
             shopId,
-            barberId: 'barber-123', // Mock barber ID
+            barberId,
             userRole,
             isLoading,
-            signOut: async () => {
-                console.log('Mock SignOut clicked');
-                // localStorage.clear(); 
-                // await supabase.auth.signOut(); 
-                // window.location.reload(); 
-            }
+            signOut
         }}>
             {children}
         </AuthContext.Provider>

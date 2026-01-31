@@ -10,35 +10,11 @@ const AppContent: React.FC = () => {
     const { session, shopId, isLoading } = useAuth();
     const [shopData, setShopData] = useState<Shop | null>(null);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
+    // Track if we started with a token to prevent immediate redirect while validating
+    const [startedWithToken] = useState(() => window.location.hash.includes('access_token'));
 
     useEffect(() => {
         const fetchShop = async () => {
-            // MOCK SHOP DATA HANDLING
-            if (shopId === 'shop-123') {
-                setShopData({
-                    id: 'shop-123',
-                    name: 'Barber Shop Dev',
-                    slug: 'barber-dev',
-                    owner_id: 'dev-123',
-                    logo_url: 'https://github.com/shadcn.png',
-                    phones: ['(11) 99999-9999'],
-                    address: {
-                        street: 'Rua Dev',
-                        number: '123',
-                        neighborhood: 'Code Valley',
-                        city: 'Tech City',
-                        state: 'SP',
-                        zipCode: '00000-000'
-                    },
-                    rating: 5,
-                    settings: {
-                        primaryColor: '#00FF9D',
-                        secondaryColor: '#000000'
-                    }
-                } as any); // Type cast as needed if Shop interface is strict
-                return;
-            }
-
             if (shopId) {
                 try {
                     const data = await getShop(shopId);
@@ -50,8 +26,19 @@ const AppContent: React.FC = () => {
         };
         fetchShop();
     }, [shopId]);
+
     // 1. Loading State
     if (isLoading) {
+        // If we started with a token, explicitly show "Sincronizando..."
+        if (startedWithToken) {
+            return (
+                <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center gap-4">
+                    <div className="w-12 h-12 border-4 border-[#00FF9D]/20 border-t-[#00FF9D] rounded-full animate-spin"></div>
+                    <span className="text-zinc-400 text-sm">Sincronizando...</span>
+                </div>
+            );
+        }
+
         return (
             <div className="min-h-screen bg-[#050505] flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
@@ -61,13 +48,29 @@ const AppContent: React.FC = () => {
         );
     }
     // 2. Auth Check
-    // 2. Auth Check
-    if (!session) {
-        // Since we are likely in a larger app, we should redirect to login
-        // If this is a standalone component being mounted, we might need a different strategy
-        // But per request "Redirect to /login"
+    // Prevent redirect if we are simply waiting for shopId but have a session (handled by AuthContext)
+    // ONLY redirect if we are truly unauthenticated AND didn't start with a token claim
+    if (!session && !startedWithToken) {
         window.location.href = '/login';
         return null;
+    }
+
+    // Access Denied / No Shop (If authenticated but no shop found)
+    if (session && !shopId && !isLoading) {
+        return (
+            <div className="min-h-screen bg-[#050505] flex items-center justify-center text-zinc-100">
+                <div className="text-center">
+                    <h2 className="text-xl font-bold mb-2">Acesso Restrito</h2>
+                    <p className="text-zinc-400">Você não tem permissão para acessar esta área.</p>
+                    <button
+                        onClick={() => window.location.href = '/login'}
+                        className="mt-4 px-4 py-2 bg-[#00FF9D] text-black font-medium rounded-lg"
+                    >
+                        Voltar para Login
+                    </button>
+                </div>
+            </div>
+        );
     }
 
     // 3. Main Render

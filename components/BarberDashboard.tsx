@@ -29,65 +29,92 @@ interface BarberDashboardProps {
 const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, shop, onProfileClick }) => {
     const auth = useAuth();
     const user = auth.user || auth.session?.user;
+    const { userProfile } = auth;
     const authLoading = auth.isLoading;
 
     const [showValues, setShowValues] = useState(true);
     const [isBlinking, setIsBlinking] = useState(false);
-    const [isAgendaPaused, setIsAgendaPaused] = useState(false);
+    // Initialize paused state based on profile.active (inverse logic: active=true -> paused=false)
+    const [isAgendaPaused, setIsAgendaPaused] = useState(userProfile ? !userProfile.active : false);
 
     // Filter State
-    const [filterMode, setFilterMode] = useState<'day' | 'week' | 'month' | 'custom'>('day');
+    const [filterMode, setFilterMode] = useState<'day' | 'week' | 'month' | 'custom'>('month');
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [selectedClient, setSelectedClient] = useState<any | null>(null);
     const [upcomingAppointments, setUpcomingAppointments] = useState<UpcomingAppointment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [dashboardData, setDashboardData] = useState<BarberDashboardData | null>(null);
 
+    const fetchDashboardData = async () => {
+        // Guarantee user.id from auth context, session, or loaded profile
+        // This must match the ID seen in [barberService] getUserProfessionalProfile
+        const userId = user?.id || auth.session?.user?.id || userProfile?.user_id;
+
+        console.log('[Dashboard] Resolving userId:', {
+            contextUser: user?.id,
+            sessionUser: auth.session?.user?.id,
+            profileUserId: userProfile?.user_id,
+            finalUserId: userId
+        });
+
+        if (userId) {
+            try {
+                console.log('[Dashboard] Starting fetch for userId:', userId);
+
+                // Keep loading true while fetching if no data
+                if (!dashboardData) setIsLoading(true);
+
+                const now = new Date();
+                let start = startOfDay(now);
+                let end = endOfDay(now);
+
+                // Determine dates based on filter
+                if (filterMode === 'week') {
+                    start = startOfWeek(now, { weekStartsOn: 1 });
+                    end = endOfWeek(now, { weekStartsOn: 1 });
+                } else if (filterMode === 'month') {
+                    start = startOfMonth(now);
+                    end = endOfMonth(now);
+                }
+
+                console.log('[Dashboard] Calling getBarberDashboardData service...', { userId, start: start.toISOString(), end: end.toISOString() });
+
+                // Call service with strict userId
+                const data = await getBarberDashboardData(userId, start.toISOString(), end.toISOString());
+
+                console.log('[Dashboard] Fetch success:', data);
+                setDashboardData(data);
+                setUpcomingAppointments(data.upcoming_appointments);
+
+                // Only update availability from dashboard if not manually toggled recently? 
+                // For now, trust the server truth.
+                setIsAgendaPaused(!data.is_active);
+            } catch (error) {
+                console.error("[Dashboard] Fetch error:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        }
+    };
+
     useEffect(() => {
+        const userId = user?.id || auth.session?.user?.id || userProfile?.user_id;
         console.log('[Dashboard] Effect triggered:', {
             hasUser: !!user,
-            userId: user?.id,
+            userId,
             authLoading,
             filterMode
         });
 
-        const fetchDashboardData = async () => {
-            if (user?.id) {
-                try {
-                    console.log('[Dashboard] Starting fetch for userId:', user.id);
-                    setIsLoading(true);
-                    const now = new Date();
-                    let start = startOfDay(now);
-                    let end = endOfDay(now);
-
-                    if (filterMode === 'week') {
-                        start = startOfWeek(now, { weekStartsOn: 1 });
-                        end = endOfWeek(now, { weekStartsOn: 1 });
-                    } else if (filterMode === 'month') {
-                        start = startOfMonth(now);
-                        end = endOfMonth(now);
-                    }
-
-                    console.log('[Dashboard] Calling getBarberDashboardData service...');
-                    const data = await getBarberDashboardData(user.id, start.toISOString(), end.toISOString());
-                    console.log('[Dashboard] Fetch success:', data);
-                    setDashboardData(data);
-                    setUpcomingAppointments(data.upcoming_appointments);
-                    setIsAgendaPaused(!data.is_active);
-                } catch (error) {
-                    console.error("[Dashboard] Fetch error:", error);
-                } finally {
-                    setIsLoading(false);
-                }
-            } else if (!authLoading) {
-                console.log('[Dashboard] No user found and auth finished. Stopping loading.');
+        if (userId) {
+            fetchDashboardData();
+        } else {
+            // If still loading auth, keep loading. If auth done and no user, stop loading (or redirect).
+            if (!authLoading) {
                 setIsLoading(false);
-            } else {
-                console.log('[Dashboard] Waiting for user or auth completion...');
             }
-        };
-        fetchDashboardData();
-    }, [user?.id, authLoading, filterMode]);
+        }
+    }, [user?.id, auth.session?.user?.id, userProfile?.user_id, authLoading, filterMode]);
 
     const formatTime = (timeString: string) => {
         if (!timeString) return '--:--';
@@ -161,63 +188,53 @@ const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, shop, onP
             }
 
             setSelectedClient(null);
-
-            // Refresh appointments
-            if (user?.id) {
-                const now = new Date();
-                const start = startOfDay(now).toISOString();
-                const end = endOfDay(now).toISOString();
-                try {
-                    const data = await getBarberDashboardData(user.id, start, end);
-                    setDashboardData(data);
-                    setUpcomingAppointments(data.upcoming_appointments);
-                    setIsAgendaPaused(!data.is_active);
-                } catch (err) {
-                    console.error('Failed to refresh dynamic data:', err);
-                }
-            }
+            fetchDashboardData(); // Refresh data
 
         } catch (error) {
             console.error('Failed to confirm presence:', error);
         }
     };
 
-    const handleTogglePause = async () => {
-        const barberId = dashboardData?.barber_id;
+    const handleToggleAvailability = async () => {
+        // Use barberId from profile first, then dashboard data
+        const barberId = userProfile?.barberId || dashboardData?.barber_id;
+
+        console.log('[handleToggleAvailability] IDs:', {
+            profileBarberId: userProfile?.barberId,
+            dashboardBarberId: dashboardData?.barber_id,
+            resolvedBarberId: barberId
+        });
+
         if (!barberId) {
-            console.error('❌ [BarberDashboard] Falha ao alternar pausa: Barber ID não encontrado no DashboardData.', { dashboardData });
+            console.error('❌ [BarberDashboard] Falha ao alternar pausa: Barber ID não encontrado.');
             return;
         }
 
-        try {
-            setIsBlinking(true);
-            const result = await toggleBarberAvailability(barberId);
+        // Optimistic Update: Toggle immediately
+        const previousState = isAgendaPaused;
+        setIsAgendaPaused(!previousState);
+        setIsBlinking(true);
 
+        try {
+            // Call the service
+            const result = await toggleBarberAvailability(barberId);
             console.log('✅ [BarberDashboard] Resultado toggle:', result);
 
-            // Verificamos o novo status retornado pela RPC
-            // A RPC toggle_barber_availability no Postgres geralmente retorna boolean ou objeto com new_status
-            if (result && typeof result.new_status !== 'undefined') {
-                setIsAgendaPaused(!result.new_status);
-            } else if (typeof result === 'boolean') {
-                setIsAgendaPaused(!result);
-            } else {
-                // Fallback: se não temos certeza do retorno, invertemos o estado local
-                setIsAgendaPaused(prev => !prev);
-            }
+            // Fetch to ensure data consistency, but UI is already updated
+            await fetchDashboardData();
 
-            // Feedback visual por alguns segundos
             setTimeout(() => {
                 setIsBlinking(false);
-            }, 3000);
+            }, 1000);
 
         } catch (error) {
             console.error('❌ [BarberDashboard] Erro ao alternar disponibilidade:', error);
+            // Revert on error
+            setIsAgendaPaused(previousState);
             alert('Falha ao alterar o status da agenda. Verifique sua conexão.');
             setIsBlinking(false);
         }
     };
-
     // Card Styles
     const bentoCardClass = "relative h-full rounded-[32px] bg-[#0A0A0A] border border-white/[0.05] overflow-hidden group shadow-2xl shadow-black/40 transition-all duration-500 hover:border-white/10";
     const BentoGridBackground = () => (
@@ -235,7 +252,7 @@ const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, shop, onP
 
                     <div>
                         <h1 className="text-xl md:text-2xl font-bold text-white leading-tight">
-                            Olá, {dashboardData?.barber_name?.split(' ')[0] || user?.user_metadata?.name?.split(' ')[0] || 'Barbeiro'}
+                            Olá, {userProfile?.name?.split(' ')[0] || dashboardData?.barber_name?.split(' ')[0] || user?.user_metadata?.name?.split(' ')[0] || 'Barbeiro'}
                         </h1>
                         <p className="text-xs text-zinc-500 font-medium tracking-wide">Bem-vindo de volta</p>
                     </div>
@@ -243,17 +260,18 @@ const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, shop, onP
 
                 <div className="flex items-center gap-3">
                     <button
-                        onClick={handleTogglePause}
+                        onClick={handleToggleAvailability}
+                        disabled={isBlinking || (!userProfile?.barberId && !dashboardData?.barber_id)}
                         className={`relative p-3 rounded-full border transition-all duration-300 group ${isAgendaPaused
                             ? 'bg-red-500/10 border-red-500/30 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.2)]'
                             : 'bg-[#00FF9D]/10 border-[#00FF9D]/20 text-[#00FF9D] hover:bg-[#00FF9D]/20 shadow-[0_0_15px_rgba(0,255,157,0.1)]'
-                            } ${isBlinking ? 'animate-pulse scale-110' : ''}`}
+                            } ${isBlinking || (!userProfile?.barberId && !dashboardData?.barber_id) ? 'animate-pulse scale-110 opacity-50 cursor-wait' : ''}`}
                     >
                         <Pause size={20} className={isAgendaPaused ? 'fill-current' : ''} />
-                        {isAgendaPaused && (
+                        {!isAgendaPaused && (
                             <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00FF9D] opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-3 w-3 bg-[#00FF9D]"></span>
                             </span>
                         )}
                     </button>
@@ -268,8 +286,8 @@ const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, shop, onP
                         className="hidden md:flex items-center gap-2 p-2 pr-4 rounded-full bg-[#0A0A0A] border border-white/5 hover:bg-white/5 transition-all"
                     >
                         <ShopAvatar
-                            name={dashboardData?.barber_name || user?.user_metadata?.name || "Barbeiro"}
-                            imageUrl={dashboardData?.barber_photo || null}
+                            name={userProfile?.name || dashboardData?.barber_name || user?.user_metadata?.name || "Barbeiro"}
+                            imageUrl={userProfile?.avatar_url || dashboardData?.barber_photo || null}
                             size="sm"
                         />
                         <span className="text-sm font-medium text-zinc-300">Minha Conta</span>
