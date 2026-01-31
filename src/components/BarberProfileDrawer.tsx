@@ -25,8 +25,7 @@ interface BarberProfileDrawerProps {
 export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
     isOpen,
     onClose,
-
-    onNavigate
+    // onNavigate
 }) => {
     const { user, signOut } = useAuth();
     const [copied, setCopied] = useState(false);

@@ -1,6 +1,5 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
 
 interface AuthContextType {
     session: Session | null;
@@ -48,11 +47,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     // FORCE MOCK STATE
-    const [session, setSession] = useState<Session | null>(MOCK_SESSION);
-    const [user, setUser] = useState<User | null>(MOCK_USER);
-    const [shopId, setShopId] = useState<string | null>(MOCK_SHOP_ID);
-    const [userRole, setUserRole] = useState<'owner' | 'barber' | null>(MOCK_ROLE);
-    const [isLoading, setIsLoading] = useState(false); // No loading needed for mock
+    const [session] = useState<Session | null>(MOCK_SESSION);
+    const [user] = useState<User | null>(MOCK_USER);
+    const [shopId] = useState<string | null>(MOCK_SHOP_ID);
+    const [userRole] = useState<'owner' | 'barber' | null>(MOCK_ROLE);
+    const [isLoading] = useState(false); // No loading needed for mock
 
     // BYPASS REAL VALIDATION FOR NOW
     /*
