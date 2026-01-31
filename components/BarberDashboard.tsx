@@ -1,0 +1,425 @@
+import React, { useState, useEffect } from 'react';
+import {
+    TrendingUp,
+    Lock,
+    AlertCircle,
+    CheckCircle2,
+    ArrowRight,
+    Clock,
+    Calendar as CalendarIcon,
+    ChevronDown,
+    Eye,
+    EyeOff,
+    Pause
+} from 'lucide-react';
+import { ShopAvatar } from './ShopAvatar';
+import { useAuth } from '../contexts/AuthContext';
+import { Shop, updateAppointmentStatus, getBarberDashboardData, BarberDashboardData, UpcomingAppointment, toggleBarberAvailability } from '../lib/services/barberService';
+import { AppointmentDetailsModal } from './AppointmentDetailsModal';
+import { NextClientCard } from './NextClientCard';
+import { startOfDay, endOfDay, format, isToday, isTomorrow, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
+
+interface BarberDashboardProps {
+    onMenuOpen: () => void;
+    onProfileClick?: () => void;
+    onNavigate: (view: 'dashboard' | 'barber-dashboard' | 'schedule' | 'finance' | 'services' | 'reports' | 'profile') => void;
+    shop?: Shop | null;
+}
+
+const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, shop, onProfileClick }) => {
+    const auth = useAuth();
+    const user = auth.user || auth.session?.user;
+    const authLoading = auth.isLoading;
+
+    const [showValues, setShowValues] = useState(true);
+    const [isBlinking, setIsBlinking] = useState(false);
+    const [isAgendaPaused, setIsAgendaPaused] = useState(false);
+
+    // Filter State
+    const [filterMode, setFilterMode] = useState<'day' | 'week' | 'month' | 'custom'>('day');
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
+    const [selectedClient, setSelectedClient] = useState<any | null>(null);
+    const [upcomingAppointments, setUpcomingAppointments] = useState<UpcomingAppointment[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [dashboardData, setDashboardData] = useState<BarberDashboardData | null>(null);
+
+    useEffect(() => {
+        console.log('[Dashboard] Effect triggered:', {
+            hasUser: !!user,
+            userId: user?.id,
+            authLoading,
+            filterMode
+        });
+
+        const fetchDashboardData = async () => {
+            if (user?.id) {
+                try {
+                    console.log('[Dashboard] Starting fetch for userId:', user.id);
+                    setIsLoading(true);
+                    const now = new Date();
+                    let start = startOfDay(now);
+                    let end = endOfDay(now);
+
+                    if (filterMode === 'week') {
+                        start = startOfWeek(now, { weekStartsOn: 1 });
+                        end = endOfWeek(now, { weekStartsOn: 1 });
+                    } else if (filterMode === 'month') {
+                        start = startOfMonth(now);
+                        end = endOfMonth(now);
+                    }
+
+                    console.log('[Dashboard] Calling getBarberDashboardData service...');
+                    const data = await getBarberDashboardData(user.id, start.toISOString(), end.toISOString());
+                    console.log('[Dashboard] Fetch success:', data);
+                    setDashboardData(data);
+                    setUpcomingAppointments(data.upcoming_appointments);
+                    setIsAgendaPaused(!data.is_active);
+                } catch (error) {
+                    console.error("[Dashboard] Fetch error:", error);
+                } finally {
+                    setIsLoading(false);
+                }
+            } else if (!authLoading) {
+                console.log('[Dashboard] No user found and auth finished. Stopping loading.');
+                setIsLoading(false);
+            } else {
+                console.log('[Dashboard] Waiting for user or auth completion...');
+            }
+        };
+        fetchDashboardData();
+    }, [user?.id, authLoading, filterMode]);
+
+    const formatTime = (timeString: string) => {
+        if (!timeString) return '--:--';
+        try {
+            if (timeString.includes('T') || timeString.includes('-')) {
+                return format(new Date(timeString), 'HH:mm');
+            }
+            return timeString.split(':').slice(0, 2).join(':');
+        } catch (e) {
+            return timeString;
+        }
+    };
+
+    const earnings = {
+        total: dashboardData?.total_earnings || 0,
+        day: dashboardData?.total_earnings || 0,
+        week: dashboardData?.total_earnings || 0,
+        month: dashboardData?.total_earnings || 0,
+        custom: 0.00
+    };
+
+    const vault = {
+        reserved: dashboardData?.wallet?.reserved_balance || 0,
+        available: dashboardData?.wallet?.balance || 0
+    };
+
+    const togglePrivacy = () => {
+        setIsBlinking(true);
+        setTimeout(() => {
+            setShowValues(!showValues);
+            setIsBlinking(false);
+        }, 200);
+    };
+
+    const renderValue = (value: number) => {
+        const formatted = new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }).format(value);
+
+        return (
+            <span className={`transition-all duration-300 ${showValues ? '' : 'blur-sm select-none'}`}>
+                {showValues ? formatted : 'R$ •••••'}
+            </span>
+        );
+    };
+
+    const handleConfirmPresence = async (client: any) => {
+        if (!client || !client.id) return;
+
+        try {
+            await updateAppointmentStatus(client.id, 'confirmed');
+
+            const appDate = new Date(client.fullDate);
+            let dateText = '';
+            if (isToday(appDate)) dateText = 'Hoje';
+            else if (isTomorrow(appDate)) dateText = 'Amanhã';
+            else dateText = format(appDate, 'dd/MM');
+
+            const message = `Olá ${client.name}, tudo certo para nosso agendamento de ${dateText} ás ${client.time} ?`;
+            const encodedMessage = encodeURIComponent(message);
+
+            const rawPhone = client.phone || client.client_whatsapp || client.whatsapp || '';
+            const phone = rawPhone.replace(/\D/g, '');
+
+            if (phone) {
+                const whatsappUrl = `https://wa.me/55${phone}?text=${encodedMessage}`;
+                window.open(whatsappUrl, '_blank');
+            }
+
+            setSelectedClient(null);
+
+            // Refresh appointments
+            if (user?.id) {
+                const now = new Date();
+                const start = startOfDay(now).toISOString();
+                const end = endOfDay(now).toISOString();
+                try {
+                    const data = await getBarberDashboardData(user.id, start, end);
+                    setDashboardData(data);
+                    setUpcomingAppointments(data.upcoming_appointments);
+                    setIsAgendaPaused(!data.is_active);
+                } catch (err) {
+                    console.error('Failed to refresh dynamic data:', err);
+                }
+            }
+
+        } catch (error) {
+            console.error('Failed to confirm presence:', error);
+        }
+    };
+
+    const handleTogglePause = async () => {
+        const barberId = dashboardData?.barber_id;
+        if (!barberId) {
+            console.error('❌ [BarberDashboard] Falha ao alternar pausa: Barber ID não encontrado no DashboardData.', { dashboardData });
+            return;
+        }
+
+        try {
+            setIsBlinking(true);
+            const result = await toggleBarberAvailability(barberId);
+
+            console.log('✅ [BarberDashboard] Resultado toggle:', result);
+
+            // Verificamos o novo status retornado pela RPC
+            // A RPC toggle_barber_availability no Postgres geralmente retorna boolean ou objeto com new_status
+            if (result && typeof result.new_status !== 'undefined') {
+                setIsAgendaPaused(!result.new_status);
+            } else if (typeof result === 'boolean') {
+                setIsAgendaPaused(!result);
+            } else {
+                // Fallback: se não temos certeza do retorno, invertemos o estado local
+                setIsAgendaPaused(prev => !prev);
+            }
+
+            // Feedback visual por alguns segundos
+            setTimeout(() => {
+                setIsBlinking(false);
+            }, 3000);
+
+        } catch (error) {
+            console.error('❌ [BarberDashboard] Erro ao alternar disponibilidade:', error);
+            alert('Falha ao alterar o status da agenda. Verifique sua conexão.');
+            setIsBlinking(false);
+        }
+    };
+
+    // Card Styles
+    const bentoCardClass = "relative h-full rounded-[32px] bg-[#0A0A0A] border border-white/[0.05] overflow-hidden group shadow-2xl shadow-black/40 transition-all duration-500 hover:border-white/10";
+    const BentoGridBackground = () => (
+        <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden rounded-[32px]">
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,black_40%,transparent_100%)] opacity-100"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent"></div>
+        </div>
+    );
+
+    return (
+        <div className="w-full min-h-screen bg-[#050505] p-6 md:p-10 font-sans text-zinc-100 pb-32">
+            {/* Header */}
+            <header className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4">
+
+                    <div>
+                        <h1 className="text-xl md:text-2xl font-bold text-white leading-tight">
+                            Olá, {dashboardData?.barber_name?.split(' ')[0] || user?.user_metadata?.name?.split(' ')[0] || 'Barbeiro'}
+                        </h1>
+                        <p className="text-xs text-zinc-500 font-medium tracking-wide">Bem-vindo de volta</p>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={handleTogglePause}
+                        className={`relative p-3 rounded-full border transition-all duration-300 group ${isAgendaPaused
+                            ? 'bg-red-500/10 border-red-500/30 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.2)]'
+                            : 'bg-[#00FF9D]/10 border-[#00FF9D]/20 text-[#00FF9D] hover:bg-[#00FF9D]/20 shadow-[0_0_15px_rgba(0,255,157,0.1)]'
+                            } ${isBlinking ? 'animate-pulse scale-110' : ''}`}
+                    >
+                        <Pause size={20} className={isAgendaPaused ? 'fill-current' : ''} />
+                        {isAgendaPaused && (
+                            <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                            </span>
+                        )}
+                    </button>
+
+                    <button className="flex md:hidden items-center gap-2 p-2 rounded-full bg-[#0A0A0A] border border-white/5" onClick={() => onProfileClick ? onProfileClick() : onNavigate('profile')}>
+                        <ShopAvatar name={shop?.name} imageUrl={shop?.logo_url} size="sm" />
+                    </button>
+
+                    {/* Desktop Profile Link */}
+                    <button
+                        onClick={() => onProfileClick ? onProfileClick() : onNavigate('profile')}
+                        className="hidden md:flex items-center gap-2 p-2 pr-4 rounded-full bg-[#0A0A0A] border border-white/5 hover:bg-white/5 transition-all"
+                    >
+                        <ShopAvatar
+                            name={dashboardData?.barber_name || user?.user_metadata?.name || "Barbeiro"}
+                            imageUrl={dashboardData?.barber_photo || null}
+                            size="sm"
+                        />
+                        <span className="text-sm font-medium text-zinc-300">Minha Conta</span>
+                    </button>
+                </div>
+            </header>
+
+            {/* Main Grid */}
+            {isLoading ? (
+                <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
+                    <div className="w-12 h-12 border-4 border-[#00FF9D]/20 border-t-[#00FF9D] rounded-full animate-spin"></div>
+                    <p className="text-zinc-500 font-medium animate-pulse">Carregando dashboard...</p>
+                </div>
+            ) : (
+                <main className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-700">
+
+                    {/* 1. Earnings Card */}
+                    <div className={`${bentoCardClass} col-span-1 lg:col-span-2`}>
+                        <BentoGridBackground />
+                        <div className="absolute top-[-20%] right-[-10%] w-[400px] h-[400px] bg-[#00FF9D]/5 rounded-full blur-[100px] pointer-events-none"></div>
+
+                        <div className="p-6 md:p-8 flex flex-col h-full relative z-10">
+                            <div className="flex items-center justify-between mb-8">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-[#00FF9D]/10 rounded-lg border border-[#00FF9D]/10 text-[#00FF9D]">
+                                        <TrendingUp size={18} />
+                                    </div>
+                                    <h2 className="text-sm md:text-base font-bold text-white uppercase tracking-wide">Meus Ganhos</h2>
+                                    <button onClick={togglePrivacy} className="p-1.5 rounded-full hover:bg-white/5 text-zinc-400 transition-colors">
+                                        {showValues ? <Eye size={18} /> : <EyeOff size={18} />}
+                                    </button>
+                                </div>
+
+                                {/* Filter Dropdown */}
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setIsFilterOpen(!isFilterOpen)}
+                                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/5 text-xs font-bold text-zinc-300 hover:text-white"
+                                    >
+                                        <CalendarIcon size={14} />
+                                        <span className="capitalize">{filterMode === 'day' ? 'Hoje' : filterMode === 'week' ? 'Esta Semana' : filterMode === 'month' ? 'Este Mês' : 'Personalizado'}</span>
+                                        <ChevronDown size={14} />
+                                    </button>
+
+                                    {isFilterOpen && (
+                                        <>
+                                            <div className="fixed inset-0 z-40" onClick={() => setIsFilterOpen(false)}></div>
+                                            <div className="absolute top-full right-0 mt-2 w-40 bg-[#121214] border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden">
+                                                {['day', 'week', 'month'].map(mode => (
+                                                    <button
+                                                        key={mode}
+                                                        onClick={() => {
+                                                            setFilterMode(mode as any);
+                                                            setIsFilterOpen(false);
+                                                        }}
+                                                        className={`w-full text-left px-4 py-3 text-xs font-bold transition-colors ${filterMode === mode ? 'text-[#00FF9D] bg-[#00FF9D]/5' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}
+                                                    >
+                                                        {mode === 'day' ? 'Hoje' : mode === 'week' ? 'Esta Semana' : 'Este Mês'}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="flex-1 flex flex-col justify-center">
+                                <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Total no período</span>
+                                <h3 className="text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-tighter">
+                                    {renderValue(earnings.total)}
+                                </h3>
+                            </div>
+
+                            <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between text-xs text-zinc-500 font-medium">
+                                <span>* Valores brutos estimados</span>
+                                <span className="text-[#00FF9D]">Dados em tempo real</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 2. Vault (Cofre) Card - MOVED UP */}
+                    <div className={`${bentoCardClass} col-span-1`}>
+                        <BentoGridBackground />
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-[#00FF9D]/5 rounded-full blur-[80px] pointer-events-none"></div>
+
+                        <div className="p-6 md:p-8 flex flex-col h-full relative z-10">
+                            <div className="flex items-center gap-3 mb-8">
+                                <div className="p-2.5 bg-[#00FF9D]/10 rounded-xl text-[#00FF9D] border border-[#00FF9D]/20">
+                                    <Lock size={20} />
+                                </div>
+                                <h3 className="font-bold text-lg text-white">Meu Cofre</h3>
+                            </div>
+
+                            <div className="space-y-4 flex-1">
+                                {/* Reserved */}
+                                <div className="p-4 rounded-2xl bg-[#050505] border border-white/5 flex justify-between items-center">
+                                    <div className="flex items-center gap-3">
+                                        <AlertCircle size={18} className="text-zinc-500" />
+                                        <span className="text-sm text-zinc-400 font-medium">No Cofre</span>
+                                    </div>
+                                    <span className="text-zinc-500/60 font-bold">{renderValue(vault.reserved)}</span>
+                                </div>
+
+                                {/* Available */}
+                                <div className="p-4 rounded-2xl bg-[#050505] border border-white/5 flex justify-between items-center group/item hover:border-[#00FF9D]/30 transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <CheckCircle2 size={18} className="text-[#00FF9D]" />
+                                        <span className="text-sm text-zinc-300 font-medium">Disponível</span>
+                                    </div>
+                                    <span className="text-white font-bold text-lg">{renderValue(vault.available)}</span>
+                                </div>
+                            </div>
+
+                            <button className="relative z-10 w-full mt-8 py-4 rounded-2xl border border-[#00FF9D]/30 text-[#00FF9D] hover:bg-[#00FF9D]/10 font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 group/btn">
+                                Solicitar Saque
+                                <ArrowRight size={16} className="group-hover/btn:translate-x-1 transition-transform" />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="col-span-1 lg:col-span-3">
+                        {upcomingAppointments.length === 0 ? (
+                            <div className={`${bentoCardClass} p-12 flex flex-col items-center justify-center gap-4 text-center`}>
+                                <BentoGridBackground />
+                                <div className="w-16 h-16 rounded-full bg-zinc-900 flex items-center justify-center border border-white/5">
+                                    <Clock size={32} className="text-zinc-500" />
+                                </div>
+                                <div>
+                                    <h3 className="text-white font-bold text-lg">Sem agendamentos para hoje</h3>
+                                    <p className="text-zinc-500 text-sm">Aproveite para descansar ou organizar suas ferramentas!</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <NextClientCard
+                                upcomingAppointments={upcomingAppointments}
+                                onSelectClient={setSelectedClient}
+                                formatTime={formatTime}
+                            />
+                        )}
+                    </div>
+
+                </main>
+            )}
+            <AppointmentDetailsModal
+                client={selectedClient}
+                onClose={() => setSelectedClient(null)}
+                onConfirm={handleConfirmPresence}
+            />
+        </div>
+    );
+};
+
+export default BarberDashboard;
