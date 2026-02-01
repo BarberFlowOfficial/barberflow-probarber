@@ -269,7 +269,7 @@ const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, shop, onP
                     >
                         <ShopAvatar
                             name={dashboardData?.barber_name || user?.user_metadata?.name || "Barbeiro"}
-                            imageUrl={dashboardData?.barber_photo || null}
+                            imageUrl={dashboardData?.barber_photo || user?.user_metadata?.avatar_url || null}
                             size="sm"
                         />
                         <span className="text-sm font-medium text-zinc-300">Minha Conta</span>

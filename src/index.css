@@ -54,12 +54,12 @@ button {
 }
 
 button:hover {
-  border-color: #646cff;
+  border-color: transparent;
 }
 
 button:focus,
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: none;
 }
 
 @media (prefers-color-scheme: light) {
@@ -75,4 +75,14 @@ button:focus-visible {
   button {
     background-color: #f9f9f9;
   }
+}
+
+/* Remove contorno azul padrão em todos os elementos */
+*,
+*:focus,
+*:active,
+*:focus-visible {
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent;
+  /* Remove flash azul no mobile */
 }

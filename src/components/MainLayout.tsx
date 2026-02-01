@@ -56,6 +56,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                     onClose={onProfileClose}
                     onNavigate={onNavigate}
                     shop={shop}
+                    isSidebarCollapsed={isSidebarCollapsed}
                 />
             ) : (
                 <MobileMenu
