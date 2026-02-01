@@ -13,6 +13,7 @@ dist-ssr
 *.local
 .agent
 .env
+instructions
 
 
 # Editor directories and files

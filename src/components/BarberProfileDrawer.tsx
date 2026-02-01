@@ -13,23 +13,34 @@ import {
     User,
     HelpCircle
 } from 'lucide-react';
+import { Shop } from '../../lib/services/barberService';
 import { ShopAvatar } from '../../components/ShopAvatar';
 import { EditProfileModal } from './profile/modals/EditProfileModal';
+import { BankingDataModal } from './profile/modals/BankingDataModal';
+import { QrCodeModal } from './profile/modals/QrCodeModal';
+import { TermsModal } from './profile/modals/TermsModal';
+import { SupportModal } from './profile/modals/SupportModal';
 
 interface BarberProfileDrawerProps {
     isOpen: boolean;
     onClose: () => void;
     onNavigate: (view: 'dashboard' | 'barber-dashboard' | 'schedule' | 'finance' | 'services' | 'reports' | 'profile') => void;
+    shop: Shop | null;
 }
 
 export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
     isOpen,
     onClose,
+    shop
     // onNavigate
 }) => {
     const { user, signOut } = useAuth();
     const [copied, setCopied] = useState(false);
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+    const [isBankingDataOpen, setIsBankingDataOpen] = useState(false);
+    const [isQrCodeOpen, setIsQrCodeOpen] = useState(false);
+    const [isTermsOpen, setIsTermsOpen] = useState(false);
+    const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
     const link = "https://barbearialinkteste.com/"; // TODO: replace with dynamic link if available
 
     // Handle back button on Android
@@ -154,9 +165,7 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
                         {/* Dados Bancários */}
                         <button
                             onClick={() => {
-                                // TODO: Logic for opening Banking Data modal or navigation
-                                // For now just close or do nothing specific as per instruction "Map out items"
-                                onClose();
+                                setIsBankingDataOpen(true);
                             }}
                             className="w-full flex items-center justify-between py-4 border-b border-white/[0.08] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
                         >
@@ -172,8 +181,7 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
                         {/* QR Code */}
                         <button
                             onClick={() => {
-                                // TODO: Logic for QR Code
-                                onClose();
+                                setIsQrCodeOpen(true);
                             }}
                             className="w-full flex items-center justify-between py-4 border-b border-white/[0.08] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
                         >
@@ -188,8 +196,10 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
 
                         {/* Ajuda e Suporte */}
                         <button
-                            onClick={() => {
-                                onClose();
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation(); // CRÍTICO: Impede que o Drawer feche ao clicar
+                                setIsSupportModalOpen(true);
                             }}
                             className="w-full flex items-center justify-between py-4 border-b border-white/[0.08] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
                         >
@@ -197,7 +207,7 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
                                 <span className="text-zinc-400 group-hover:text-white transition-colors">
                                     <HelpCircle size={20} />
                                 </span>
-                                <span className="text-[16px] text-white font-normal">Ajuda e suporte</span>
+                                <span className="text-[16px] text-white font-normal">Ajuda e Suporte</span>
                             </div>
                             <ChevronRight size={16} className="text-zinc-600 group-hover:text-zinc-400 transition-colors" />
                         </button>
@@ -205,8 +215,7 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
                         {/* Termos e Privacidade */}
                         <button
                             onClick={() => {
-                                // TODO: Logic for Terms
-                                onClose();
+                                setIsTermsOpen(true);
                             }}
                             className="w-full flex items-center justify-between py-4 border-b border-white/[0.08] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
                         >
@@ -239,6 +248,24 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
             <EditProfileModal
                 isOpen={isEditProfileOpen}
                 onClose={() => setIsEditProfileOpen(false)}
+            />
+            <BankingDataModal
+                isOpen={isBankingDataOpen}
+                onClose={() => setIsBankingDataOpen(false)}
+            />
+            <QrCodeModal
+                isOpen={isQrCodeOpen}
+                onClose={() => setIsQrCodeOpen(false)}
+                shop={shop}
+            />
+            <TermsModal
+                isOpen={isTermsOpen}
+                onClose={() => setIsTermsOpen(false)}
+                shop={shop}
+            />
+            <SupportModal
+                isOpen={isSupportModalOpen}
+                onClose={() => setIsSupportModalOpen(false)}
             />
         </div>
     );
