@@ -146,7 +146,7 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
                         </div>
 
                         {/* 3. Items List */}
-                        <div className="flex flex-col border-t border-white/[0.08] mt-8">
+                        <div className="flex flex-col mt-8">
 
                             {/* Meu Perfil */}
                             <button
@@ -159,7 +159,7 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
                                     // If we close drawer, going back from modal might be weird.
                                     // Let's keep drawer open for now.
                                 }}
-                                className="w-full flex items-center justify-between py-4 border-b border-white/[0.08] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
+                                className="w-full flex items-center justify-between py-4 bg-[#0d0d0d] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
                             >
                                 <div className="flex items-center gap-4">
                                     <span className="text-zinc-400 group-hover:text-white transition-colors">
@@ -175,7 +175,7 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
                                 onClick={() => {
                                     setIsBankingDataOpen(true);
                                 }}
-                                className="w-full flex items-center justify-between py-4 border-b border-white/[0.08] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
+                                className="w-full flex items-center justify-between py-4 bg-[#0d0d0d] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
                             >
                                 <div className="flex items-center gap-4">
                                     <span className="text-zinc-400 group-hover:text-white transition-colors">
@@ -191,7 +191,7 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
                                 onClick={() => {
                                     setIsQrCodeOpen(true);
                                 }}
-                                className="w-full flex items-center justify-between py-4 border-b border-white/[0.08] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
+                                className="w-full flex items-center justify-between py-4 bg-[#0d0d0d] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
                             >
                                 <div className="flex items-center gap-4">
                                     <span className="text-zinc-400 group-hover:text-white transition-colors">
@@ -209,7 +209,7 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
                                     e.stopPropagation(); // CRÍTICO: Impede que o Drawer feche ao clicar
                                     setIsSupportModalOpen(true);
                                 }}
-                                className="w-full flex items-center justify-between py-4 border-b border-white/[0.08] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
+                                className="w-full flex items-center justify-between py-4 bg-[#0d0d0d] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
                             >
                                 <div className="flex items-center gap-4">
                                     <span className="text-zinc-400 group-hover:text-white transition-colors">
@@ -225,7 +225,7 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
                                 onClick={() => {
                                     setIsTermsOpen(true);
                                 }}
-                                className="w-full flex items-center justify-between py-4 border-b border-white/[0.08] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
+                                className="w-full flex items-center justify-between py-4 bg-[#0d0d0d] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
                             >
                                 <div className="flex items-center gap-4">
                                     <span className="text-zinc-400 group-hover:text-white transition-colors">
@@ -244,7 +244,7 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
                         {/* 6. Sair da conta */}
                         <button
                             onClick={handleLogout}
-                            className="w-full flex items-center gap-4 py-4 hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group rounded-xl px-2 -mx-2 mb-safe-bottom"
+                            className="w-full flex items-center gap-4 py-4 bg-[#0d0d0d] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group rounded-xl px-2 -mx-2 mb-safe-bottom"
                         >
                             <span className="text-[#FF6B6B] group-hover:text-red-400 transition-colors"><LogOut size={20} /></span>
                             <span className="text-[16px] text-[#FF6B6B] font-medium group-hover:text-red-400 transition-colors">Sair da conta</span>

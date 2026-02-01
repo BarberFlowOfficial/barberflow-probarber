@@ -117,7 +117,7 @@ export const BarberSidebar: React.FC<BarberSidebarProps> = ({ currentView, onNav
             <div className={`p-4 border-t border-white/5 ${isCollapsed ? 'flex justify-center' : ''}`}>
                 <button
                     onClick={handleLogout}
-                    className={`flex items-center text-zinc-500 hover:text-red-400 hover:bg-red-500/5 transition-all duration-200 group
+                    className={`flex items-center text-zinc-500 hover:text-red-400 hover:bg-red-500/5 transition-all duration-200 group bg-[#0d0d0d]
                         ${isCollapsed ? 'justify-center p-3 rounded-xl w-full' : 'w-full px-4 py-3.5 gap-3 rounded-xl'}
                     `}
                     title={isCollapsed ? "Sair" : undefined}
