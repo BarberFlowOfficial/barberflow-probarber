@@ -16,19 +16,21 @@ import {
     Link2,
     Check,
     ChevronRight,
-    
+
     Landmark,
     QrCode,
     FileText,
-    User
+    User,
+
 } from 'lucide-react';
 
 import { Shop } from '../../lib/services/barberService';
 import { ShopAvatar } from '../../components/ShopAvatar';
+import { EditProfileModal } from './profile/modals/EditProfileModal';
 import { BankingDataModal } from './profile/modals/BankingDataModal';
-import { QrCodeModal } from './profile/modals/QrCodeModal';
+import { QrCodeModal } from '@/components/profile/modals/QrCodeModal';
 import { TermsModal } from './profile/modals/TermsModal';
-import { MyProfileModal } from './profile/modals/MyProfileModal';
+
 
 interface MobileMenuProps {
     isOpen: boolean;
@@ -52,7 +54,9 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
     const [isBankingModalOpen, setIsBankingModalOpen] = useState(false);
     const [isQrCodeModalOpen, setIsQrCodeModalOpen] = useState(false);
     const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
-    const [isMyProfileModalOpen, setIsMyProfileModalOpen] = useState(false);
+    const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
+
+
 
     // Handle back button on Android
     useEffect(() => {
@@ -111,12 +115,13 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
                 ></div>
 
                 {/* Drawer */}
+
                 <div className="relative w-full md:w-[400px] h-full bg-[#0D0D0D] p-6 border-l border-white/10 shadow-2xl overflow-y-auto animate-in slide-in-from-right duration-300 flex flex-col pb-safe">
 
                     {/* MODALS */}
-                    <MyProfileModal
-                        isOpen={isMyProfileModalOpen}
-                        onClose={() => setIsMyProfileModalOpen(false)}
+                    <EditProfileModal
+                        isOpen={isEditProfileModalOpen}
+                        onClose={() => setIsEditProfileModalOpen(false)}
                     />
                     <BankingDataModal
                         isOpen={isBankingModalOpen}
@@ -132,6 +137,8 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
                         onClose={() => setIsTermsModalOpen(false)}
                         shop={shop}
                     />
+
+
 
                     {/* Header */}
                     <div className="flex items-center justify-end mb-6">
@@ -183,12 +190,12 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
                         </div>
 
                         {/* 3. Items List (Copied Design from OptionList) */}
-                        <div className="flex flex-col border-t border-white/[0.08] mt-8">
+                        <div className="flex flex-col mt-8">
 
                             {/* Meu Perfil */}
                             <button
-                                onClick={() => setIsMyProfileModalOpen(true)}
-                                className="w-full flex items-center justify-between py-4 border-b border-white/[0.08] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
+                                onClick={() => setIsEditProfileModalOpen(true)}
+                                className="w-full flex items-center justify-between py-4 bg-[#0d0d0d] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
                             >
                                 <div className="flex items-center gap-4">
                                     <span className="text-zinc-400 group-hover:text-white transition-colors">
@@ -202,7 +209,7 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
                             {/* Dados Bancários */}
                             <button
                                 onClick={() => setIsBankingModalOpen(true)}
-                                className="w-full flex items-center justify-between py-4 border-b border-white/[0.08] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
+                                className="w-full flex items-center justify-between py-4 bg-[#0d0d0d] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
                             >
                                 <div className="flex items-center gap-4">
                                     <span className="text-zinc-400 group-hover:text-white transition-colors">
@@ -216,7 +223,7 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
                             {/* QR Code */}
                             <button
                                 onClick={() => setIsQrCodeModalOpen(true)}
-                                className="w-full flex items-center justify-between py-4 border-b border-white/[0.08] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
+                                className="w-full flex items-center justify-between py-4 bg-[#0d0d0d] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
                             >
                                 <div className="flex items-center gap-4">
                                     <span className="text-zinc-400 group-hover:text-white transition-colors">
@@ -230,7 +237,7 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
                             {/* Termos e Privacidade */}
                             <button
                                 onClick={() => setIsTermsModalOpen(true)}
-                                className="w-full flex items-center justify-between py-4 border-b border-white/[0.08] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
+                                className="w-full flex items-center justify-between py-4 bg-[#0d0d0d] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group"
                             >
                                 <div className="flex items-center gap-4">
                                     <span className="text-zinc-400 group-hover:text-white transition-colors">
@@ -241,6 +248,8 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
                                 <ChevronRight size={16} className="text-zinc-600 group-hover:text-zinc-400 transition-colors" />
                             </button>
 
+
+
                         </div>
 
 
@@ -249,7 +258,7 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
                         {/* 6. Sair da conta */}
                         <button
                             onClick={handleLogout}
-                            className="w-full flex items-center gap-4 py-4 hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group rounded-xl px-2 -mx-2 mb-safe-bottom"
+                            className="w-full flex items-center gap-4 py-4 bg-[#0d0d0d] hover:bg-white/[0.03] active:bg-white/[0.05] transition-all group rounded-xl px-2 -mx-2 mb-safe-bottom"
                         >
                             <span className="text-[#FF6B6B] group-hover:text-red-400 transition-colors"><LogOut size={20} /></span>
                             <span className="text-[16px] text-[#FF6B6B] font-medium group-hover:text-red-400 transition-colors">Sair da conta</span>
