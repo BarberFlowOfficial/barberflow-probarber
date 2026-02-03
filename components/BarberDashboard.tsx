@@ -86,6 +86,10 @@ const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, shop, onP
                 setDashboardData(data);
                 setUpcomingAppointments(data.upcoming_appointments);
 
+                // Salva o ID que acabou de ser usado com sucesso
+                localStorage.setItem('barberflow_user_id', userId);
+                console.log('[Dashboard] ID validado e salvo no cache:', userId);
+
                 // Only update availability from dashboard if not manually toggled recently? 
                 // For now, trust the server truth.
                 setIsAgendaPaused(!data.is_active);

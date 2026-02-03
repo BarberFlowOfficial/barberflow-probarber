@@ -1,5 +1,58 @@
 import { supabase } from '../supabase';
 
+export interface BarberProfileBasics {
+    name: string;
+    avatar_url: string;
+    email: string;
+    cpf: string;
+    telefone: string;
+}
+
+export const getBarberProfile = async (userId: string): Promise<BarberProfileBasics | null> => {
+    console.log('[RPC] Chamando get_barber_profile_basics com ID:', userId);
+    const { data, error } = await supabase.rpc('get_barber_profile_basics', {
+        p_user_id: userId
+    });
+    console.log("getBarberProfile: data", data);
+    if (error) {
+        console.error('Error fetching barber profile:', error);
+        return null;
+    }
+
+    if (data && Array.isArray(data) && data.length > 0) {
+        const profile = data[0];
+        return {
+            ...profile,
+            telefone: profile.phone || profile.telefone || ''
+        } as BarberProfileBasics;
+    } else if (data && !Array.isArray(data)) {
+        return {
+            ...data,
+            telefone: data.phone || data.telefone || ''
+        } as BarberProfileBasics;
+    }
+
+    return null;
+};
+
+export const updateBarberProfileBasics = async (userId: string, profileData: BarberProfileBasics) => {
+    const { data, error } = await supabase.rpc('update_barber_profile_basics', {
+        p_user_id: userId,
+        p_name: profileData.name,
+        p_avatar_url: profileData.avatar_url,
+        p_email: profileData.email,
+        p_cpf: profileData.cpf,
+        p_telefone: profileData.telefone
+    });
+
+    if (error) {
+        console.error('Error updating barber profile:', error);
+        throw error;
+    }
+
+    return data;
+};
+
 export interface UpcomingAppointment {
     appointment_id: string;
     customer_name: string;

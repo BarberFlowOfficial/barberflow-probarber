@@ -87,6 +87,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 if (existingSession) {
                     setSession(existingSession);
                     setUser(existingSession.user);
+                    // Cache User ID
+                    if (existingSession.user?.id) {
+                        localStorage.setItem('barberflow_user_id', existingSession.user.id);
+                    }
                     if (!shopId) {
                         await validateProfile(existingSession.user.id);
                     }
@@ -102,13 +106,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setSession(newSession);
                 setUser(newSession?.user ?? null);
 
+                // Immediate Persistence
+                if (newSession?.user?.id) {
+                    localStorage.setItem('barberflow_user_id', newSession.user.id);
+                    console.log('[AuthContext] ID persistido no cache:', newSession.user.id);
+                }
+
                 if (newSession?.user && _event === 'SIGNED_IN') {
                     await validateProfile(newSession.user.id);
                 } else if (_event === 'SIGNED_OUT') {
+                    // Clear Cache
+                    localStorage.removeItem('barberflow_user_id');
                     setUserProfile(null);
                     setShopId(null);
                     setBarberId(null);
                     setUserRole(null);
+                    console.log('[AuthContext] Cache limpo após SignOut.');
                 }
 
                 setIsLoading(false);
@@ -125,6 +138,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const signOut = async () => {
         await supabase.auth.signOut();
+        // Clear Cache
+        localStorage.removeItem('barberflow_user_id');
         setSession(null);
         setUser(null);
         setUserProfile(null);

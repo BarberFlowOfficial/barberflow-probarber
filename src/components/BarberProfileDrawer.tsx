@@ -13,7 +13,7 @@ import {
     User,
     HelpCircle
 } from 'lucide-react';
-import { Shop } from '../../lib/services/barberService';
+import { Shop, BarberProfileBasics, getBarberProfile } from '../../lib/services/barberService';
 import { ShopAvatar } from '../../components/ShopAvatar';
 import { EditProfileModal } from './profile/modals/EditProfileModal';
 import { BankingDataModal } from './profile/modals/BankingDataModal';
@@ -36,6 +36,7 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
     isSidebarCollapsed = false
     // onNavigate
 }) => {
+    console.log('[Drawer] Renderizando. isOpen:', isOpen);
     const { user, signOut } = useAuth();
     const [copied, setCopied] = useState(false);
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -44,6 +45,37 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
     const [isTermsOpen, setIsTermsOpen] = useState(false);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
     const link = "https://barbearialinkteste.com/"; // TODO: replace with dynamic link if available
+
+    // Profile Data State
+    const [profileData, setProfileData] = useState<BarberProfileBasics | null>(null);
+
+    // Function to refresh profile data
+    const refreshProfile = async () => {
+        const cachedId = localStorage.getItem('barberflow_user_id');
+        const targetId = cachedId || user?.id;
+
+        console.log('[Drawer] Tentando carregar dados. ID no cache:', cachedId, 'ID no context:', user?.id);
+
+        if (targetId) {
+            console.log('[Drawer] Chamando banco para ID:', targetId);
+            const data = await getBarberProfile(targetId);
+            console.log('[Drawer] Dados retornados do banco:', data);
+            if (data) setProfileData(data);
+        } else {
+            console.error('[Drawer] Erro: Nenhum ID encontrado para buscar perfil.');
+        }
+    };
+
+    // Fetch profile data when Drawer opens
+    useEffect(() => {
+        if (user?.id) {
+            localStorage.setItem('barberflow_user_id', user.id);
+        }
+
+        if (isOpen) {
+            refreshProfile();
+        }
+    }, [isOpen, user?.id]);
 
     // Handle back button on Android
     useEffect(() => {
@@ -113,15 +145,15 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
                             <div className="relative mb-4">
                                 <div className="absolute inset-0 rounded-full bg-[#00FF9D] blur-md opacity-20"></div>
                                 <ShopAvatar
-                                    name={user?.user_metadata?.name || 'Barbeiro'}
-                                    imageUrl={user?.user_metadata?.avatar_url || null}
+                                    name={profileData?.name || user?.user_metadata?.name || 'Barbeiro'}
+                                    imageUrl={profileData?.avatar_url || user?.user_metadata?.avatar_url || null}
                                     size="custom"
                                     customSize="110px"
                                     className="border-[3px] border-[#00FF9D] p-1 relative z-10"
                                 />
                             </div>
                             <h2 className="text-xl font-bold text-white mb-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                                {user?.user_metadata?.name || 'Barbeiro'}
+                                {profileData?.name || user?.user_metadata?.name || 'Carregando...'}
                             </h2>
 
                             {/* 2. Copy Link */}
@@ -254,10 +286,15 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
                 </div>
             </div>
 
-            <EditProfileModal
-                isOpen={isEditProfileOpen}
-                onClose={() => setIsEditProfileOpen(false)}
-            />
+            {isEditProfileOpen && (
+                <EditProfileModal
+                    isOpen={isEditProfileOpen}
+                    onClose={() => setIsEditProfileOpen(false)}
+                    onSaveSuccess={refreshProfile}
+                    initialData={profileData}
+                    userId={user?.id || localStorage.getItem('barberflow_user_id') || undefined}
+                />
+            )}
             <BankingDataModal
                 isOpen={isBankingDataOpen}
                 onClose={() => setIsBankingDataOpen(false)}

@@ -14,22 +14,98 @@ import {
 } from 'lucide-react';
 import { ShopAvatar } from '../../../../components/ShopAvatar';
 import { useAuth } from '../../../../contexts/AuthContext';
+import { updateBarberProfileBasics, getBarberProfile, BarberProfileBasics } from '../../../../lib/services/barberService';
 
 interface EditProfileModalProps {
     isOpen: boolean;
     onClose: () => void;
+    onSaveSuccess?: () => void;
+    initialData?: BarberProfileBasics | null;
+    userId?: string;
 }
 
-export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose }) => {
-    const { user } = useAuth();
+export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, initialData, onSaveSuccess }) => {
+    const { user } = useAuth(); // Still use context as helper, but logic below overrides
+
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Form State
-    const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
-    const [phone, setPhone] = useState('');
-    const [cpf, setCpf] = useState('');
-    const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+    // Form State -- Initialize with keys
+    const [name, setName] = useState(initialData?.name || '');
+    const [email, setEmail] = useState(initialData?.email || '');
+    const [telefone, setTelefone] = useState('');
+    const [cpf, setCpf] = useState(initialData?.cpf || '');
+    const [avatarPreview, setAvatarPreview] = useState<string | null>(initialData?.avatar_url || null);
+    const [avatarUrl, setAvatarUrl] = useState<string>(initialData?.avatar_url || '');
+
+    const [isLoading, setIsLoading] = useState(false);
+
+    // Sync state when initialData changes
+    useEffect(() => {
+        const loadData = async (targetId: string) => {
+            setIsLoading(true);
+            console.log('[Modal] Buscando dados para ID:', targetId);
+            try {
+                const data = await getBarberProfile(targetId);
+                if (data) {
+                    console.log('[Modal] Dados recuperados:', data);
+                    setName(data.name || '');
+                    setEmail(data.email || '');
+                    setTelefone(data.telefone || '');
+                    setCpf(data.cpf || '');
+                    setAvatarUrl(data.avatar_url || '');
+                    setAvatarPreview(data.avatar_url || null);
+                    console.log('[Modal] Dados carregados incluindo telefone:', data.telefone);
+                } else {
+                    console.warn('[Modal] Nenhum dado retornado para o ID:', targetId);
+                }
+            } catch (error) {
+                console.error('[Modal] Erro ao buscar perfil:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        const checkAndLoad = async () => {
+            if (!isOpen) return;
+
+            if (initialData) {
+                console.log('[Modal] Usando initialData recebido de props:', initialData);
+                setName(initialData.name || '');
+                setEmail(initialData.email || '');
+                setTelefone(initialData.telefone || '');
+                setCpf(initialData.cpf || '');
+                setAvatarUrl(initialData.avatar_url || '');
+                setAvatarPreview(initialData.avatar_url || null);
+                console.log('[Modal] Dados carregados (initialData) incluindo telefone:', initialData.telefone);
+                return;
+            }
+
+            // Direct Cache Fetch with Reactive Delay
+            let cachedId = localStorage.getItem('barberflow_user_id');
+
+            if (!cachedId) {
+                console.log('[Modal] ID não encontrado no cache. Tentativa reativa em 100ms...');
+                await new Promise(resolve => setTimeout(resolve, 100));
+                cachedId = localStorage.getItem('barberflow_user_id');
+            }
+
+            if (cachedId) {
+                console.log('[Modal] ID encontrado no cache:', cachedId);
+                await loadData(cachedId);
+            } else {
+                console.error('[Modal] Erro Crítico: ID não encontrado no cache mesmo com modal aberta.');
+                // Try context last resort
+                if (user?.id) {
+                    console.log('[Modal] Tentando ID do contexto:', user.id);
+                    await loadData(user.id);
+                }
+            }
+        };
+
+        checkAndLoad();
+
+    }, [initialData, isOpen, user?.id]);
+
 
     // Password Section State
     const [showPasswordSection, setShowPasswordSection] = useState(false);
@@ -42,16 +118,10 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-    // Initial Data Load
-    useEffect(() => {
-        if (isOpen && user) {
-            setName(user.user_metadata?.name || '');
-            setEmail(user.email || '');
-            // Mock data for fields that might not be in auth metadata yet or need specific structure
-            setPhone(user.user_metadata?.phone || '');
-            setAvatarPreview(user.user_metadata?.avatar_url || null);
-        }
-    }, [isOpen, user]);
+    // No separate useEffect for loading needed if we rely on initialData passed from parent.
+    // However, if we want to be safe, we can keep a fallback fetch. 
+    // Given the user instruction "When opening profile modal call helper, and verify info is loaded", 
+    // relying on parent is safer for "instant" feel.
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -59,25 +129,64 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
             const reader = new FileReader();
             reader.onloadend = () => {
                 setAvatarPreview(reader.result as string);
+                setAvatarUrl(reader.result as string);
             };
             reader.readAsDataURL(file);
         }
     };
 
-    const handleSave = () => {
-        // Logic to save profile
-        console.log({
-            name,
-            email,
-            phone,
-            cpf,
-            avatar: avatarPreview,
-            password: showPasswordSection ? { currentPassword, newPassword } : null
-        });
-        onClose();
+    const handleSave = async () => {
+        // Direct Cache Fetch to be absolutely sure
+        const cachedId = localStorage.getItem('barberflow_user_id');
+        const targetId = cachedId || user?.id;
+
+        if (!targetId) {
+            console.error('[Modal] Erro ao salvar: ID do usuário não encontrado.');
+            return;
+        }
+
+        setIsLoading(true);
+
+        try {
+            console.log('[Modal] Salvando alterações para ID:', targetId);
+            console.log('[Modal] Enviando para atualização:', { name, telefone });
+            await updateBarberProfileBasics(targetId, {
+                name,
+                email, // Mantendo os outros campos como estão nos estados
+                telefone,
+                cpf,
+                avatar_url: avatarUrl
+            });
+
+            console.log('[Modal] Salvo com sucesso!');
+
+            // Callback para o componente pai atualizar os dados em tempo real
+            if (onSaveSuccess) {
+                onSaveSuccess();
+            }
+
+            onClose();
+        } catch (e) {
+            console.error("[Modal] Erro ao salvar perfil:", e);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     if (!isOpen) return null;
+
+    // Loading Guard: If loading and no name (initial values)
+    if (isLoading && !name) {
+        return (
+            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+                <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose}></div>
+                <div className="relative w-full max-w-[500px] bg-[#0D0D0D] border border-white/10 rounded-2xl p-12 flex flex-col items-center justify-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="w-12 h-12 border-4 border-[#00FF9D]/20 border-t-[#00FF9D] rounded-full animate-spin"></div>
+                    <p className="text-zinc-400 font-medium">Carregando dados do perfil...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
@@ -169,8 +278,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
                                 <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
                                 <input
                                     type="tel"
-                                    value={phone}
-                                    onChange={(e) => setPhone(e.target.value)}
+                                    value={telefone}
+                                    onChange={(e) => setTelefone(e.target.value)}
                                     className="w-full bg-[#1C1C1E] border border-white/5 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-[#00FF9D]/50 focus:ring-1 focus:ring-[#00FF9D]/50 transition-all placeholder:text-zinc-600"
                                     placeholder="(00) 00000-0000"
                                 />
@@ -285,9 +394,17 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
                 <div className="p-6 border-t border-white/10 bg-[#0D0D0D] rounded-b-2xl">
                     <button
                         onClick={handleSave}
-                        className="w-full bg-[#00FF9D] text-black font-bold py-4 rounded-xl hover:bg-[#00FF9D]/90 active:scale-[0.98] transition-all"
+                        disabled={isLoading}
+                        className="w-full bg-[#00FF9D] text-black font-bold py-4 rounded-xl hover:bg-[#00FF9D]/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
                     >
-                        Salvar Alterações
+                        {isLoading ? (
+                            <div className="flex items-center gap-2">
+                                <div className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin"></div>
+                                <span>Salvando...</span>
+                            </div>
+                        ) : (
+                            "Salvar Alterações"
+                        )}
                     </button>
                 </div>
 
