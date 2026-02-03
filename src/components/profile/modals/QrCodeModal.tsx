@@ -14,7 +14,7 @@ export const QrCodeModal: React.FC<QrCodeModalProps> = ({ isOpen, onClose, shop 
     const [copied, setCopied] = React.useState(false);
     const qrRef = useRef<SVGSVGElement>(null);
 
-    const baseUrl = import.meta.env.VITE_BARBERFLOW_CLIENT_URL || "https://agendar.barberflow.com/";
+    const baseUrl = (import.meta.env.VITE_BARBERFLOW_CLIENT_URL || "https://agendar.barberflow.com").replace(/\/$/, "");
     const redirectUrl = shop?.redirect_url || "";
     const deepLink = `${baseUrl}/${redirectUrl}`;
 
@@ -87,14 +87,14 @@ export const QrCodeModal: React.FC<QrCodeModalProps> = ({ isOpen, onClose, shop 
                             size={256}
                             level="H"
                             includeMargin={false}
-                            imageSettings={{
-                                src: shop?.logo_url || "",
+                            imageSettings={shop?.logo_url ? {
+                                src: shop.logo_url,
                                 x: undefined,
                                 y: undefined,
                                 height: 48,
                                 width: 48,
                                 excavate: true,
-                            }}
+                            } : undefined}
                         />
                     </div>
 

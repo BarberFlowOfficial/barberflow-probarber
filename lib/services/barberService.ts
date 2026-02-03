@@ -229,6 +229,26 @@ export const getShop = async (shopId: string | null = null, userId: string | nul
     }
 };
 
+export const getShopDetails = async (shopId: string): Promise<{ name: string; logo_url: string | null; redirect_url: string } | null> => {
+    try {
+        const { data, error } = await supabase
+            .from('shops')
+            .select('name, logo_url, redirect_url')
+            .eq('id', shopId)
+            .single();
+
+        if (error) {
+            console.error('[getShopDetails] Error fetching shop details:', error);
+            return null;
+        }
+
+        return data;
+    } catch (e) {
+        console.error('[getShopDetails] Unexpected error:', e);
+        return null;
+    }
+};
+
 export const updateAppointmentStatus = async (appointmentId: string, status: string) => {
     const { data, error } = await supabase
         .from('appointments')

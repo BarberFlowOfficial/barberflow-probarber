@@ -20,7 +20,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({ isOpen, onClose, title, ch
             ></div>
 
             {/* Modal Container */}
-            <div className="relative w-full max-w-sm bg-[#0D0D0D] border border-white/10 rounded-2xl shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            <div className="relative w-full max-w-sm bg-[#0D0D0D] border border-white/10 rounded-3xl shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200">
 
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 pb-2">

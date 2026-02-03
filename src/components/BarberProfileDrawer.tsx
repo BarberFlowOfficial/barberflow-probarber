@@ -13,7 +13,7 @@ import {
     User,
     HelpCircle
 } from 'lucide-react';
-import { Shop, BarberProfileBasics, getBarberProfile } from '../../lib/services/barberService';
+import { Shop, BarberProfileBasics, getBarberProfile, getShopDetails, getMyShopId } from '../../lib/services/barberService';
 import { ShopAvatar } from '../../components/ShopAvatar';
 import { EditProfileModal } from './profile/modals/EditProfileModal';
 import { BankingDataModal } from './profile/modals/BankingDataModal';
@@ -48,6 +48,7 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
 
     // Profile Data State
     const [profileData, setProfileData] = useState<BarberProfileBasics | null>(null);
+    const [currentShop, setCurrentShop] = useState<Shop | null>(shop);
 
     // Function to refresh profile data
     const refreshProfile = async () => {
@@ -61,6 +62,17 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
             const data = await getBarberProfile(targetId);
             console.log('[Drawer] Dados retornados do banco:', data);
             if (data) setProfileData(data);
+
+            // Fetch shop details for QR Code if not already present or needs update
+            if (!currentShop) {
+                const sId = await getMyShopId(targetId);
+                if (sId) {
+                    const sDetails = await getShopDetails(sId);
+                    if (sDetails) {
+                        setCurrentShop({ ...shop, ...sDetails, id: sId } as Shop);
+                    }
+                }
+            }
         } else {
             console.error('[Drawer] Erro: Nenhum ID encontrado para buscar perfil.');
         }
@@ -302,7 +314,7 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
             <QrCodeModal
                 isOpen={isQrCodeOpen}
                 onClose={() => setIsQrCodeOpen(false)}
-                shop={shop}
+                shop={currentShop}
             />
             <TermsModal
                 isOpen={isTermsOpen}
