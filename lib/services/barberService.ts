@@ -266,3 +266,24 @@ export const getMyShopId = async (userId: string) => {
 
     return finalResult;
 };
+
+export const acceptTerms = async (shopId: string) => {
+    console.log('Accepting terms for shopId:', shopId);
+    const { data, error } = await supabase
+        .from('shops')
+        .update({
+            terms_accepted: true,
+            terms_accepted_at: new Date().toISOString()
+        })
+        .eq('id', shopId)
+        .select();
+
+    console.log('Dados acceptTerms = ', data);
+
+    if (error) {
+        console.error('Error in acceptTerms Supabase call:', error);
+        throw error;
+    }
+
+    return data;
+};
