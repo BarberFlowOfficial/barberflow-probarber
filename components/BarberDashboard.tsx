@@ -82,6 +82,7 @@ const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, shop, onP
                 // Call service with strict userId
                 const data = await getBarberDashboardData(userId, start.toISOString(), end.toISOString());
 
+                console.log('💰 Ganhos calculados do JSONB:', data.total_earnings);
                 console.log('[Dashboard] Fetch success:', data);
                 setDashboardData(data);
                 setUpcomingAppointments(data.upcoming_appointments);

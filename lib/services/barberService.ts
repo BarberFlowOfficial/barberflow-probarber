@@ -118,12 +118,21 @@ export const getBarberDashboardData = async (
         p_end_date: endDate
     });
 
-    console.log('Data:', data);
+    console.log('✅ Dashboard Data:', data);
     console.log('Error:', error);
 
     if (error) {
         console.error('Error fetching barber dashboard data:', error);
-        throw error;
+        // Retornar um objeto vazio estruturado em caso de erro para manter o dashboard funcional
+        return {
+            barber_name: 'Profissional',
+            barber_photo: null,
+            total_earnings: 0,
+            wallet: { balance: 0, reserved_balance: 0 },
+            upcoming_appointments: [],
+            is_active: true,
+            barber_id: ''
+        };
     }
 
     const result = data || {};
