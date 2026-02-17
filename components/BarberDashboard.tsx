@@ -242,16 +242,20 @@ const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, shop, onP
                             } ${isBlinking || (!userProfile?.barberId && !dashboardData?.barber_id) ? 'animate-pulse scale-110 opacity-50 cursor-wait' : ''}`}
                     >
                         <Pause size={20} className={isAgendaPaused ? 'fill-current' : ''} />
-                        {!isAgendaPaused && (
+                        {isAgendaPaused && (
                             <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00FF9D] opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-3 w-3 bg-[#00FF9D]"></span>
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
                             </span>
                         )}
                     </button>
 
                     <button className="flex md:hidden items-center gap-2 p-2 rounded-full bg-[#0A0A0A] border border-white/5" onClick={() => onProfileClick ? onProfileClick() : onNavigate('profile')}>
-                        <ShopAvatar name={shop?.name} imageUrl={shop?.logo_url} size="sm" />
+                        <ShopAvatar
+                            name={userProfile?.name || dashboardData?.barber_name || user?.user_metadata?.name || "Barbeiro"}
+                            imageUrl={userProfile?.avatar_url || dashboardData?.barber_photo || null}
+                            size="sm"
+                        />
                     </button>
 
                     {/* Desktop Profile Link */}
@@ -302,8 +306,8 @@ const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, shop, onP
                                         className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/5 text-xs font-bold text-zinc-300 hover:text-white"
                                     >
                                         <CalendarIcon size={14} />
-                                        <span className="capitalize">{filterMode === 'day' ? 'Hoje' : filterMode === 'week' ? 'Esta Semana' : filterMode === 'month' ? 'Este Mês' : 'Personalizado'}</span>
-                                        <ChevronDown size={14} />
+                                        <span className="capitalize hidden md:block">{filterMode === 'day' ? 'Hoje' : filterMode === 'week' ? 'Esta Semana' : filterMode === 'month' ? 'Este Mês' : 'Personalizado'}</span>
+                                        <ChevronDown size={14} className="hidden md:block" />
                                     </button>
 
                                     {isFilterOpen && (
