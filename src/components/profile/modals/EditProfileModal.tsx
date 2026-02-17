@@ -14,7 +14,9 @@ import {
 } from 'lucide-react';
 import { ShopAvatar } from '../../../../components/ShopAvatar';
 import { useAuth } from '../../../../contexts/AuthContext';
-import { updateBarberProfileBasics, getBarberProfile, BarberProfileBasics } from '../../../../lib/services/barberService';
+import { updateBarberProfileBasics, getBarberProfile, uploadProfileImage, BarberProfileBasics } from '../../../../lib/services/barberService';
+
+// ... (existing imports/interfaces)
 
 interface EditProfileModalProps {
     isOpen: boolean;
@@ -36,6 +38,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
     const [cpf, setCpf] = useState(initialData?.cpf || '');
     const [avatarPreview, setAvatarPreview] = useState<string | null>(initialData?.avatar_url || null);
     const [avatarUrl, setAvatarUrl] = useState<string>(initialData?.avatar_url || '');
+    const [selectedFile, setSelectedFile] = useState<File | null>(null); // New state for file
 
     const [isLoading, setIsLoading] = useState(false);
 
@@ -118,18 +121,14 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-    // No separate useEffect for loading needed if we rely on initialData passed from parent.
-    // However, if we want to be safe, we can keep a fallback fetch. 
-    // Given the user instruction "When opening profile modal call helper, and verify info is loaded", 
-    // relying on parent is safer for "instant" feel.
-
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            setSelectedFile(file); // Store file for upload
             const reader = new FileReader();
             reader.onloadend = () => {
                 setAvatarPreview(reader.result as string);
-                setAvatarUrl(reader.result as string);
+                // Don't set avatarUrl yet, wait for upload
             };
             reader.readAsDataURL(file);
         }
@@ -148,15 +147,31 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
         setIsLoading(true);
 
         try {
+            let currentAvatarUrl = avatarUrl;
+
+            // Upload image if selected
+            if (selectedFile) {
+                console.log('[Modal] Upload de nova imagem iniciado...');
+                const uploadedUrl = await uploadProfileImage(targetId, selectedFile);
+                if (uploadedUrl) {
+                    console.log('[Modal] Upload concluído, nova URL:', uploadedUrl);
+                    currentAvatarUrl = uploadedUrl;
+                    setAvatarUrl(uploadedUrl);
+                } else {
+                    console.warn('[Modal] Falha no upload da imagem, mantendo URL anterior.');
+                }
+            }
+
             console.log('[Modal] Salvando alterações para ID:', targetId);
-            console.log('[Modal] Enviando para atualização:', { name, telefone });
+            console.log('[Modal] Enviando para atualização:', { name, telefone, cpf, avatar_url: currentAvatarUrl });
+
             await updateBarberProfileBasics(targetId, {
                 name,
                 email, // Mantendo os outros campos como estão nos estados
                 telefone,
                 cpf,
-                avatar_url: avatarUrl
-            });
+                avatar_url: currentAvatarUrl
+            } as BarberProfileBasics); // Type assertion or proper object construction
 
             console.log('[Modal] Salvo com sucesso!');
 

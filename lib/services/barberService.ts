@@ -113,21 +113,58 @@ export const getMyShopId = async (userId: string) => {
     return finalResult;
 };
 
+export const uploadProfileImage = async (userId: string, file: File): Promise<string | null> => {
+    try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `profile-${userId}-${Date.now()}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        console.log('[uploadProfileImage] Iniciando upload:', filePath);
+
+        const { error: uploadError } = await supabase.storage
+            .from('professional-logos')
+            .upload(filePath, file);
+
+        if (uploadError) {
+            console.error('[uploadProfileImage] Erro no upload:', uploadError);
+            return null;
+        }
+
+        const { data } = supabase.storage
+            .from('professional-logos')
+            .getPublicUrl(filePath);
+
+        console.log('[uploadProfileImage] URL gerada:', data.publicUrl);
+        return data.publicUrl;
+    } catch (e) {
+        console.error('[uploadProfileImage] Erro inesperado:', e);
+        return null;
+    }
+};
+
 export const updateBarberProfileBasics = async (userId: string, profileData: BarberProfileBasics) => {
-    const { data, error } = await supabase.rpc('update_barber_profile_basics', {
+    console.log('[updateBarberProfileBasics] Chamando RPC update_barber_profile...');
+
+    // Mapeamento para RPC update_barber_profile
+    const params = {
         p_user_id: userId,
         p_name: profileData.name,
-        p_avatar_url: profileData.avatar_url,
         p_email: profileData.email,
-        p_cpf_cnpj: profileData.cpf_cnpj || profileData.cpf,
-        p_telefone: profileData.telefone
-    });
+        p_telefone: profileData.telefone || profileData.phone, // Ensure phone is passed
+        p_cpf: profileData.cpf || profileData.cpf_cnpj,       // Ensure CPF is passed
+        p_avatar_url: profileData.avatar_url
+    };
+
+    console.log('[updateBarberProfileBasics] Parâmetros:', params);
+
+    const { data, error } = await supabase.rpc('update_barber_profile', params);
 
     if (error) {
         console.error('Error updating barber profile:', error);
         throw error;
     }
 
+    console.log('[updateBarberProfileBasics] Sucesso! Dados retornados:', data);
     return data;
 };
 
