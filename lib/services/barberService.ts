@@ -4,16 +4,21 @@ export interface BarberProfileBasics {
     name: string;
     avatar_url: string;
     email: string;
-    cpf: string;
+    cpf: string; // Maintain for UI compatibility
+    cpf_cnpj: string; // Database column
     telefone: string;
+    phone: string; // UI compatibility
 }
 
 export const getBarberProfile = async (userId: string): Promise<BarberProfileBasics | null> => {
     console.log('[RPC] Chamando get_barber_profile_basics com ID:', userId);
+
     const { data, error } = await supabase.rpc('get_barber_profile_basics', {
         p_user_id: userId
     });
+
     console.log("getBarberProfile: data", data);
+
     if (error) {
         console.error('Error fetching barber profile:', error);
         return null;
@@ -23,16 +28,89 @@ export const getBarberProfile = async (userId: string): Promise<BarberProfileBas
         const profile = data[0];
         return {
             ...profile,
-            telefone: profile.phone || profile.telefone || ''
+            // Map 'cpf_cnpj' (DB) -> 'cpf' (UI)
+            cpf: profile.cpf_cnpj || profile.cpf || '',
+            cpf_cnpj: profile.cpf_cnpj || profile.cpf || '',
+            // Map 'telefone' (DB) -> 'phone' (UI)
+            phone: profile.telefone || profile.phone || '',
+            telefone: profile.telefone || profile.phone || ''
         } as BarberProfileBasics;
     } else if (data && !Array.isArray(data)) {
         return {
             ...data,
-            telefone: data.phone || data.telefone || ''
+            cpf: data.cpf_cnpj || data.cpf || '',
+            cpf_cnpj: data.cpf_cnpj || data.cpf || '',
+            phone: data.telefone || data.phone || '',
+            telefone: data.telefone || data.phone || ''
         } as BarberProfileBasics;
     }
 
     return null;
+};
+
+// ... (keep updateBarberProfileBasics as is or check if it needs update too? User only mentioned getBarberProfile)
+
+export const getMyShopId = async (userId: string) => {
+    console.log('1. getMyShopId: Iniciando busca para UID:', userId);
+
+    // Timeout de 4 segundos para garantir que a aplicação não trave
+    const timeoutPromise = new Promise<null>((resolve) => {
+        setTimeout(() => {
+            console.warn('4. getMyShopId: Timeout de 4s atingido. Tentando cache local.');
+            resolve(null);
+        }, 4000);
+    });
+
+    const fetchWorker = async () => {
+        try {
+            // Passo 1: Busca na tabela barbers
+            console.log('2. getMyShopId: Buscando na tabela barbers...');
+            const { data: barberData, error: barberError } = await supabase
+                .from('barbers')
+                .select('shop_id')
+                .eq('user_id', userId)
+                .maybeSingle();
+
+            if (barberData?.shop_id) {
+                console.log('3. getMyShopId: Sucesso tabela barbers:', barberData.shop_id);
+                return barberData.shop_id as string;
+            }
+
+            // Passo 2 (Fallback): Busca na tabela barbers_owners
+            console.log('5. getMyShopId: Fallback para tabela barbers_owners...');
+            const { data: ownerData, error: ownerError } = await supabase
+                .from('barbers_owners')
+                .select('shop_id') // shop_id aqui é o ID da barbearia
+                .eq('user_id', userId)
+                .maybeSingle();
+
+            if (ownerData?.shop_id) {
+                console.log('6. getMyShopId: Sucesso tabela barbers_owners:', ownerData.shop_id);
+                return ownerData.shop_id as string;
+            }
+
+            // Apenas loga erro se falhar em AMBOS e houver erro real (não apenas 'null')
+            if (barberError) console.warn('(!) getMyShopId: Erro barbers:', barberError.message);
+            if (ownerError) console.warn('(!) getMyShopId: Erro barbers_owners:', ownerError.message);
+
+            console.warn('(!) getMyShopId: Shop ID não encontrado em nenhuma tabela.');
+
+        } catch (err: any) {
+            console.error('(!) getMyShopId: Erro capturado no fluxo:', err);
+        }
+        return null;
+    };
+
+    // Corrida entre a busca real e o timeout
+    const finalResult = await Promise.race([fetchWorker(), timeoutPromise]);
+
+    if (!finalResult) {
+        const cachedId = localStorage.getItem('barberflow_shop_id');
+        console.log('7. getMyShopId: Retornando valor final (Cache fallback):', cachedId);
+        return cachedId;
+    }
+
+    return finalResult;
 };
 
 export const updateBarberProfileBasics = async (userId: string, profileData: BarberProfileBasics) => {
@@ -41,7 +119,7 @@ export const updateBarberProfileBasics = async (userId: string, profileData: Bar
         p_name: profileData.name,
         p_avatar_url: profileData.avatar_url,
         p_email: profileData.email,
-        p_cpf: profileData.cpf,
+        p_cpf_cnpj: profileData.cpf_cnpj || profileData.cpf,
         p_telefone: profileData.telefone
     });
 
@@ -317,67 +395,7 @@ export const toggleBarberAvailability = async (barberId: string) => {
     return data; // Returns text message
 };
 
-export const getMyShopId = async (userId: string) => {
-    console.log('1. getMyShopId: Iniciando busca para UID:', userId);
 
-    // Timeout de 4 segundos para garantir que a aplicação não trave
-    const timeoutPromise = new Promise<null>((resolve) => {
-        setTimeout(() => {
-            console.warn('4. getMyShopId: Timeout de 4s atingido. Tentando cache local.');
-            resolve(null);
-        }, 4000);
-    });
-
-    const fetchWorker = async () => {
-        try {
-            console.log('2. getMyShopId: Chamando RPC get_my_shop_id...');
-            const { data: rpcData, error: rpcError } = await supabase.rpc('get_my_shop_id', {
-                p_user_id: userId
-            });
-
-            if (rpcData) {
-                console.log('3. getMyShopId: Sucesso via RPC:', rpcData);
-                return rpcData as string;
-            }
-
-            if (rpcError) console.warn('(!) getMyShopId: Falha no RPC, tentando busca direta...');
-
-            console.log('5. getMyShopId: Iniciando busca direta na tabela barbers_owners...');
-            const { data: fbData, error: fbError } = await supabase
-                .from('barbers_owners')
-                .select('shop_id')
-                .eq('user_id', userId)
-                .single();
-
-            if (fbData?.shop_id) {
-                console.log('6. getMyShopId: Sucesso via busca direta:', fbData.shop_id);
-                return fbData.shop_id as string;
-            }
-
-            if (fbError) console.error('(!) getMyShopId: Erro no fallback direto:', fbError);
-
-        } catch (err: any) {
-            const isAborted = err.message?.includes('Fetch Aborted') || err.name === 'AbortError';
-            if (isAborted) {
-                console.warn('(!) getMyShopId: Requisição cancelada pelo sistema (provável redirecionamento).');
-            } else {
-                console.error('(!) getMyShopId: Erro capturado no fluxo:', err);
-            }
-        }
-        return null;
-    };
-
-    // Corrida entre a busca real e o timeout
-    const finalResult = await Promise.race([fetchWorker(), timeoutPromise]);
-
-    if (!finalResult) {
-        const cachedId = localStorage.getItem('barberflow_shop_id');
-        console.log('7. getMyShopId: Retornando valor final (Cache fallback):', cachedId);
-        return cachedId;
-    }
-
-    return finalResult;
-};
 
 export const acceptTerms = async (shopId: string) => {
     console.log('Accepting terms for shopId:', shopId);
