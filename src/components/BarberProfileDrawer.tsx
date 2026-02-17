@@ -44,7 +44,7 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
     const [isQrCodeOpen, setIsQrCodeOpen] = useState(false);
     const [isTermsOpen, setIsTermsOpen] = useState(false);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
-    const link = "https://barbearialinkteste.com/"; // TODO: replace with dynamic link if available
+
 
     // Profile Data State
     const [profileData, setProfileData] = useState<BarberProfileBasics | null>(null);
@@ -110,9 +110,17 @@ export const BarberProfileDrawer: React.FC<BarberProfileDrawerProps> = ({
 
     // Handle Copy Link
     const handleCopy = () => {
-        navigator.clipboard.writeText(link);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        const baseUrl = (import.meta.env.VITE_BARBERFLOW_CLIENT_URL || "https://agendar.barberflow.com").replace(/\/$/, "");
+        const redirectUrl = currentShop?.redirect_url || shop?.redirect_url || "";
+        const deepLink = `${baseUrl}/${redirectUrl}`;
+
+        if (redirectUrl) {
+            navigator.clipboard.writeText(deepLink);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } else {
+            console.warn("Redirect URL not found");
+        }
     };
 
     const handleLogout = async () => {
