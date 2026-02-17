@@ -14,10 +14,10 @@ import {
 } from 'lucide-react';
 import { ShopAvatar } from './ShopAvatar';
 import { useAuth } from '../contexts/AuthContext';
-import { Shop, updateAppointmentStatus, getBarberDashboardData, BarberDashboardData, UpcomingAppointment, toggleBarberAvailability } from '../lib/services/barberService';
+import { Shop, getBarberDashboardData, BarberDashboardData, UpcomingAppointment, toggleBarberAvailability } from '../lib/services/barberService';
 import { AppointmentDetailsModal } from './AppointmentDetailsModal';
 import { NextClientCard } from './NextClientCard';
-import { startOfDay, endOfDay, format, isToday, isTomorrow, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from 'date-fns';
 
 interface BarberDashboardProps {
     onMenuOpen: () => void;
@@ -167,37 +167,6 @@ const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, shop, onP
                 {showValues ? formatted : 'R$ •••••'}
             </span>
         );
-    };
-
-    const handleConfirmPresence = async (client: any) => {
-        if (!client || !client.id) return;
-
-        try {
-            await updateAppointmentStatus(client.id, 'confirmed');
-
-            const appDate = new Date(client.fullDate);
-            let dateText = '';
-            if (isToday(appDate)) dateText = 'Hoje';
-            else if (isTomorrow(appDate)) dateText = 'Amanhã';
-            else dateText = format(appDate, 'dd/MM');
-
-            const message = `Olá ${client.name}, tudo certo para nosso agendamento de ${dateText} ás ${client.time} ?`;
-            const encodedMessage = encodeURIComponent(message);
-
-            const rawPhone = client.phone || client.client_whatsapp || client.whatsapp || '';
-            const phone = rawPhone.replace(/\D/g, '');
-
-            if (phone) {
-                const whatsappUrl = `https://wa.me/55${phone}?text=${encodedMessage}`;
-                window.open(whatsappUrl, '_blank');
-            }
-
-            setSelectedClient(null);
-            fetchDashboardData(); // Refresh data
-
-        } catch (error) {
-            console.error('Failed to confirm presence:', error);
-        }
     };
 
     const handleToggleAvailability = async () => {
@@ -439,7 +408,7 @@ const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, shop, onP
             <AppointmentDetailsModal
                 client={selectedClient}
                 onClose={() => setSelectedClient(null)}
-                onConfirm={handleConfirmPresence}
+                onConfirm={() => fetchDashboardData()}
             />
         </div>
     );

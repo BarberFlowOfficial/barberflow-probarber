@@ -137,6 +137,45 @@ export const getBarberDashboardData = async (
 
     const result = data || {};
 
+    // Verify if we need to enrich phone numbers (RPC might miss it)
+    let enrichedAppointments = (result.upcoming_appointments || []).map((item: any) => ({
+        appointment_id: item.appointment_id,
+        customer_name: item.customer_name || 'Cliente',
+        customer_avatar_url: item.customer_avatar_url || null,
+        services_list: item.services_list || 'Nenhum serviço',
+        appointment_time: item.appointment_time,
+        status: item.status || 'confirmed',
+        barber_name: item.barber_name || '',
+        // Map all potential phone fields
+        client_whatsapp: item.client_whatsapp || item.customer_phone || item.phone || item.whatsapp || null
+    }));
+
+    // If phones are missing, do a quick lookup
+    const missingPhones = enrichedAppointments.filter((a: any) => !a.client_whatsapp);
+    if (missingPhones.length > 0) {
+        console.log('Fetching missing phone numbers for', missingPhones.length, 'appointments...');
+        const appointmentIds = missingPhones.map((a: any) => a.appointment_id);
+
+        const { data: details } = await supabase
+            .from('appointments')
+            .select('id, client_id, clients(phone, whatsapp)')
+            .in('id', appointmentIds);
+
+        if (details) {
+            const phoneMap = new Map();
+            details.forEach((d: any) => {
+                // Prioritize whatsapp over phone
+                const phone = d.clients?.whatsapp || d.clients?.phone;
+                if (phone) phoneMap.set(d.id, phone);
+            });
+
+            enrichedAppointments = enrichedAppointments.map((a: any) => ({
+                ...a,
+                client_whatsapp: a.client_whatsapp || phoneMap.get(a.appointment_id) || null
+            }));
+        }
+    }
+
     return {
         barber_name: result.barber_name || 'Profissional',
         barber_photo: result.barber_photo || null,
@@ -145,16 +184,7 @@ export const getBarberDashboardData = async (
             balance: Number(result.wallet?.balance || 0),
             reserved_balance: Number(result.wallet?.reserved_balance || 0)
         },
-        upcoming_appointments: (result.upcoming_appointments || []).map((item: any) => ({
-            appointment_id: item.appointment_id,
-            customer_name: item.customer_name || 'Cliente',
-            customer_avatar_url: item.customer_avatar_url || null,
-            services_list: item.services_list || 'Nenhum serviço',
-            appointment_time: item.appointment_time,
-            status: item.status || 'confirmed',
-            barber_name: item.barber_name || '',
-            client_whatsapp: item.client_whatsapp || null
-        })),
+        upcoming_appointments: enrichedAppointments,
         is_active: !!(result.is_active ?? result.active ?? true),
         barber_id: result.barber_id || result.id || ''
     };

@@ -1,6 +1,9 @@
 import React from 'react';
 import { User, X, Clock, Scissors, MessageCircle } from 'lucide-react';
 
+import { updateAppointmentStatus } from '../lib/services/barberService';
+import { format, isToday, isTomorrow } from 'date-fns';
+
 interface AppointmentDetailsModalProps {
     client: any;
     onClose: () => void;
@@ -9,6 +12,66 @@ interface AppointmentDetailsModalProps {
 
 export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = ({ client, onClose, onConfirm }) => {
     if (!client) return null;
+
+    const handleConfirmPresence = async (selectedClient: any) => {
+        // Log para depuração da estrutura do objeto
+        console.log("Estrutura do agendamento:", JSON.stringify(selectedClient, null, 2));
+
+        // 1. Prepare WhatsApp URL & Open immediately (to avoid popup blockers)
+        // Busca exaustiva pelo telefone
+        const rawPhone =
+            selectedClient.phone ||
+            selectedClient.client_whatsapp ||
+            selectedClient.whatsapp ||
+            selectedClient.whatsapp_contact ||
+            selectedClient.client?.phone ||
+            selectedClient.client?.whatsapp_contact ||
+            selectedClient.telephone ||
+            '';
+
+        const phone = rawPhone.replace(/\D/g, '');
+
+        const appDate = new Date(selectedClient.fullDate);
+        let dateText = '';
+        try {
+            if (isToday(appDate)) dateText = 'Hoje';
+            else if (isTomorrow(appDate)) dateText = 'Amanhã';
+            else dateText = format(appDate, 'dd/MM');
+        } catch (e) {
+            console.error('Date error:', e);
+            dateText = 'Data inválida';
+        }
+
+        const message = `Olá ${selectedClient.name}, tudo certo para nosso agendamento de ${dateText} às ${selectedClient.time}?`;
+        const encodedMessage = encodeURIComponent(message);
+
+        if (phone) {
+            const whatsappUrl = `https://wa.me/55${phone}?text=${encodedMessage}`;
+            window.open(whatsappUrl, '_blank');
+        } else {
+            console.warn('Telefone não encontrado para o cliente:', selectedClient.name);
+            alert('Não foi possível encontrar o telefone deste cliente. Verifique o cadastro.');
+        }
+
+        // 2. Perform Async Updates
+        try {
+            // Sempre executa o update, a menos que seja canceled (garantido pelo botão disabled, mas bom ter check extra se quiser)
+            if (selectedClient.status !== 'canceled') {
+                await updateAppointmentStatus(selectedClient.id, 'confirmed');
+            }
+
+            // Call the callback to refresh parent data if needed
+            if (onConfirm) onConfirm(selectedClient);
+
+            // Clean state (close modal)
+            onClose();
+
+        } catch (error) {
+            console.error('Failed to confirm presence:', error);
+        }
+    };
+
+
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-4" style={{ perspective: '1000px' }}>
@@ -51,7 +114,11 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
                     </div>
                     <div className="flex items-center gap-2 text-zinc-400">
                         <Scissors size={16} />
-                        <span className="font-medium text-sm">{client.service || 'Serviços'}</span>
+                        <span className="font-medium text-sm">
+                            {Array.isArray(client.service)
+                                ? client.service.map((s: any) => s.name || s).join(', ')
+                                : (client.service?.name || client.service || 'Serviços')}
+                        </span>
                     </div>
                 </div>
 
@@ -68,15 +135,15 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
 
                 {/* Confirm Button */}
                 <button
-                    onClick={() => client.status === 'confirmed' && onConfirm(client)}
-                    disabled={client.status !== 'confirmed'}
-                    className={`w-full font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 ${client.status === 'confirmed'
+                    onClick={() => handleConfirmPresence(client)}
+                    disabled={client.status === 'canceled'}
+                    className={`w-full font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 ${client.status !== 'canceled'
                         ? 'bg-[#00FF9D] hover:bg-[#00CC7D] text-black'
                         : 'bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-50'
                         }`}
                 >
                     <MessageCircle size={20} />
-                    {client.status === 'confirmed' ? 'Confirmar Presença' : 'Já Confirmado'}
+                    {client.status === 'confirmed' ? 'Reenviar Confirmação' : 'Confirmar Presença'}
                 </button>
 
             </div>
