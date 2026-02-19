@@ -26,7 +26,7 @@ interface BarberDashboardProps {
     shop?: Shop | null;
 }
 
-const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, shop, onProfileClick }) => {
+const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, onProfileClick }) => {
     const auth = useAuth();
     const user = auth.user || auth.session?.user;
     const { userProfile } = auth;
