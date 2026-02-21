@@ -315,7 +315,7 @@ export interface Shop {
     instagram?: string;
     cep?: string;
     address?: string;
-    number?: string;
+
     neighborhood?: string;
     city?: string;
     state?: string;
@@ -341,7 +341,7 @@ export const getShop = async (shopId: string | null = null, userId: string | nul
             console.log(`[getShop] Tentando buscar por ID: ${shopId}`);
             const { data, error } = await supabase
                 .from('shops')
-                .select('id, name, barber_owner, logo_url, description, whatsapp_contact, instagram_handle, cep, address, number, neighborhood, city, state, redirect_url, terms_accepted, terms_accepted_at')
+                .select('id, name, barber_owner, logo_url, description, whatsapp_contact, instagram_handle, cep, address, neighborhood, city, state, redirect_url, terms_accepted, terms_accepted_at')
                 .eq('id', shopId)
                 .single();
 
@@ -363,7 +363,7 @@ export const getShop = async (shopId: string | null = null, userId: string | nul
             console.error('[getShop] Erro no RPC por slug:', error);
             const { data: directData, error: directError } = await supabase
                 .from('shops')
-                .select('id, name, barber_owner, logo_url, description, whatsapp_contact, instagram_handle, cep, address, number, neighborhood, city, state, redirect_url')
+                .select('id, name, barber_owner, logo_url, description, whatsapp_contact, instagram_handle, cep, address, neighborhood, city, state, redirect_url')
                 .eq('slug', 'barbearianaregua-3caf')
                 .single();
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     TrendingUp,
     Lock,
@@ -17,7 +17,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { Shop, getBarberDashboardData, BarberDashboardData, UpcomingAppointment, toggleBarberAvailability } from '../lib/services/barberService';
 import { AppointmentDetailsModal } from './AppointmentDetailsModal';
 import { NextClientCard } from './NextClientCard';
+import { WithdrawalModal } from './WithdrawalModal';
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from 'date-fns';
+import { supabase } from '../lib/supabase';
 
 interface BarberDashboardProps {
     onMenuOpen: () => void;
@@ -26,7 +28,7 @@ interface BarberDashboardProps {
     shop?: Shop | null;
 }
 
-const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, onProfileClick }) => {
+const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, onProfileClick, shop }) => {
     const auth = useAuth();
     const user = auth.user || auth.session?.user;
     const { userProfile } = auth;
@@ -44,6 +46,9 @@ const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, onProfile
     const [upcomingAppointments, setUpcomingAppointments] = useState<UpcomingAppointment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [dashboardData, setDashboardData] = useState<BarberDashboardData | null>(null);
+    const [isWithdrawalOpen, setIsWithdrawalOpen] = useState(false);
+    const [isSyncingBalance, setIsSyncingBalance] = useState(false);
+    const lastSyncRef = useRef(0);
 
     const fetchDashboardData = async () => {
         // Guarantee user.id from auth context, session, or loaded profile
@@ -120,6 +125,53 @@ const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, onProfile
             }
         }
     }, [user?.id, auth.session?.user?.id, userProfile?.user_id, authLoading, filterMode]);
+
+    useEffect(() => {
+        const syncBalance = async () => {
+            const userId = user?.id || auth.session?.user?.id || userProfile?.user_id;
+            const shopId = userProfile?.shopId || shop?.id;
+
+            if (!shopId || !userId) {
+                console.warn("[Dashboard] Sincronização abortada: IDs ausentes", { shopId, userId });
+                setIsSyncingBalance(false);
+                return;
+            }
+
+            const now = Date.now();
+            if (now - lastSyncRef.current < 60000) return;
+
+            console.log('[Dashboard] Iniciando sincronização de saldo com Asaas...');
+            console.log("Payload Sync:", { shopId, userId });
+
+            setIsSyncingBalance(true);
+            try {
+                const { data, error } = await supabase.functions.invoke('sync-asaas-balance', {
+                    body: { shopId, userId }
+                });
+
+                if (error) throw error;
+
+                if (data) {
+                    console.log('[Dashboard] Saldo sincronizado com sucesso:', data);
+                    setDashboardData(prev => prev ? ({
+                        ...prev,
+                        wallet: {
+                            ...prev.wallet,
+                            balance: Number(data.balance || 0),
+                            reserved_balance: Number(data.reserved_balance || 0)
+                        }
+                    }) : prev);
+                    lastSyncRef.current = Date.now();
+                }
+            } catch (err) {
+                console.error('[Dashboard] Erro na sincronização de saldo Asaas:', err);
+            } finally {
+                setIsSyncingBalance(false);
+            }
+        };
+
+        syncBalance();
+    }, [userProfile?.shopId, shop?.id, user?.id, auth.session?.user?.id, userProfile?.user_id]);
 
     const formatTime = (timeString: string) => {
         if (!timeString) return '--:--';
@@ -353,10 +405,18 @@ const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, onProfile
 
                         <div className="p-6 md:p-8 flex flex-col h-full relative z-10">
                             <div className="flex items-center gap-3 mb-8">
-                                <div className="p-2.5 bg-[#00FF9D]/10 rounded-xl text-[#00FF9D] border border-[#00FF9D]/20">
-                                    <Lock size={20} />
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2.5 bg-[#00FF9D]/10 rounded-xl text-[#00FF9D] border border-[#00FF9D]/20">
+                                        <Lock size={20} />
+                                    </div>
+                                    <h3 className="font-bold text-lg text-white">Meu Cofre</h3>
                                 </div>
-                                <h3 className="font-bold text-lg text-white">Meu Cofre</h3>
+                                {isSyncingBalance && (
+                                    <div className="ml-auto flex items-center gap-2">
+                                        <div className="w-3.5 h-3.5 border-2 border-[#00FF9D]/30 border-t-[#00FF9D] rounded-full animate-spin" />
+                                        <span className="text-[10px] text-[#00FF9D]/60 uppercase font-bold tracking-wider">Sincronizando</span>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="space-y-4 flex-1">
@@ -379,7 +439,10 @@ const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, onProfile
                                 </div>
                             </div>
 
-                            <button className="relative z-10 w-full mt-8 py-4 rounded-2xl border border-[#00FF9D]/30 text-[#00FF9D] hover:bg-[#00FF9D]/10 font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 group/btn">
+                            <button
+                                onClick={() => setIsWithdrawalOpen(true)}
+                                className="relative z-10 w-full mt-8 py-4 rounded-2xl border border-[#00FF9D]/30 text-[#00FF9D] hover:bg-[#00FF9D]/10 font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 group/btn"
+                            >
                                 Solicitar Saque
                                 <ArrowRight size={16} className="group-hover/btn:translate-x-1 transition-transform" />
                             </button>
@@ -414,6 +477,16 @@ const BarberDashboard: React.FC<BarberDashboardProps> = ({ onNavigate, onProfile
                 onClose={() => setSelectedClient(null)}
                 onConfirm={() => fetchDashboardData()}
             />
+            {dashboardData?.wallet && (
+                <WithdrawalModal
+                    isOpen={isWithdrawalOpen}
+                    onClose={() => setIsWithdrawalOpen(false)}
+                    shopId={userProfile?.shopId || shop?.id || ''}
+                    userId={user?.id || auth.session?.user?.id || userProfile?.user_id || ''}
+                    walletData={dashboardData.wallet}
+                    onSuccess={() => fetchDashboardData()}
+                />
+            )}
         </div>
     );
 };
